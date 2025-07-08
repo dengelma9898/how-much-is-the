@@ -21,6 +21,7 @@ fun SearchFilterSheet(
     onSelectedStoresChange: (List<String>) -> Unit,
     onUnitChange: (String?) -> Unit,
     onMaxPriceChange: (BigDecimal?) -> Unit,
+    onPostalCodeChange: (String) -> Unit,
     onClose: () -> Unit
 ) {
     Column(
@@ -53,6 +54,17 @@ fun SearchFilterSheet(
                 )
             }
         }
+        
+        // Postleitzahl
+        OutlinedTextField(
+            value = uiState.postalCode,
+            onValueChange = onPostalCodeChange,
+            label = { Text("Postleitzahl") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth(),
+            supportingText = { Text("Ihre aktuelle Postleitzahl für lokale Angebote") }
+        )
+        
         // Einheit
         OutlinedTextField(
             value = uiState.unit ?: "",
