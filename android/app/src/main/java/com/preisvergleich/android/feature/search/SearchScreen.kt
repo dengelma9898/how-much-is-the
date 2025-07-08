@@ -122,6 +122,32 @@ fun SearchScreen(
                         }
                     }
                 }
+            } else if (uiState.query.isNotBlank()) {
+                // Hint für neue Nutzer
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Tipp: Klicke auf das + Symbol, um diese Suche zu speichern!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
             
             // Suchfeld mit Filter-Icon
@@ -140,40 +166,59 @@ fun SearchScreen(
                         }
                     ),
                     trailingIcon = {
-                        Box {
-                            IconButton(
-                                onClick = { viewModel.openFilterSheet(true) },
-                                modifier = Modifier
-                                    .scale(filterIconScale)
-                                    .background(
-                                        if (filterActive && uiState.filtersEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
-                                        shape = CircleShape
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FilterList,
-                                    contentDescription = "Filter",
-                                    tint = when {
-                                        filterActive && uiState.filtersEnabled -> MaterialTheme.colorScheme.primary
-                                        !uiState.filtersEnabled -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        else -> Color.Gray
+                        Row {
+                            // Save Icon - always visible when query is not empty
+                            if (uiState.query.isNotBlank()) {
+                                IconButton(
+                                    onClick = {
+                                        saveSearchName = uiState.query
+                                        showSaveDialog = true
                                     }
-                                )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Suche speichern",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
-                            if (filterActive && uiState.filtersEnabled) {
-                                Box(
+                            
+                            // Filter Icon
+                            Box {
+                                IconButton(
+                                    onClick = { viewModel.openFilterSheet(true) },
                                     modifier = Modifier
-                                        .size(10.dp)
-                                        .background(Color.Red, shape = CircleShape)
-                                        .align(Alignment.TopEnd)
-                                )
-                            } else if (!uiState.filtersEnabled) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .background(MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape)
-                                        .align(Alignment.TopEnd)
-                                )
+                                        .scale(filterIconScale)
+                                        .background(
+                                            if (filterActive && uiState.filtersEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FilterList,
+                                        contentDescription = "Filter",
+                                        tint = when {
+                                            filterActive && uiState.filtersEnabled -> MaterialTheme.colorScheme.primary
+                                            !uiState.filtersEnabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            else -> Color.Gray
+                                        }
+                                    )
+                                }
+                                if (filterActive && uiState.filtersEnabled) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(Color.Red, shape = CircleShape)
+                                            .align(Alignment.TopEnd)
+                                    )
+                                } else if (!uiState.filtersEnabled) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape)
+                                            .align(Alignment.TopEnd)
+                                    )
+                                }
                             }
                         }
                     }
