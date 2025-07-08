@@ -8,8 +8,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,24 +30,24 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.math.BigDecimal
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier,
-    initialPostalCode: String? = null,
-    onPostalCodeChanged: (String) -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
-    // Initialize postal code when screen is first composed
-    LaunchedEffect(initialPostalCode) {
-        initialPostalCode?.let { 
-            viewModel.onPostalCodeChange(it)
-        }
-    }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val filterActive = uiState.selectedStores.isNotEmpty() || uiState.unit != null || uiState.maxPrice != null
     val filterIconScale by animateFloatAsState(targetValue = if (uiState.isFilterSheetOpen) 1.15f else 1f, label = "filterIconScale")
+    
+    // State für Save Dialog
+    var showSaveDialog by remember { mutableStateOf(false) }
+    var saveSearchName by remember { mutableStateOf("") }
+    
+    // State für Delete Dialog
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var searchToDelete by remember { mutableStateOf<SavedSearch?>(null) }
     
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -58,45 +64,67 @@ fun SearchScreen(
                 ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // App icon placeholder (will show your green icon)
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary,
-                                shape = RoundedCornerShape(12.dp)
-                            ),
-                        contentAlignment = Alignment.Center
+                    Text(
+                        text = "Preisvergleich",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Finden Sie die besten Angebote in Ihrer Nähe",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
+            
+            // Gespeicherte Suchen
+            if (uiState.savedSearches.isNotEmpty()) {
+                Column {
+                    Text(
+                        text = "Gespeicherte Suchen",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
                     ) {
-                        Text(
-                            text = "🛒",
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                    }
-                    
-                    Column {
-                        Text(
-                            text = "Preisvergleich",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "Finden Sie die besten Preise",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                        )
+                        uiState.savedSearches.forEach { savedSearch ->
+                            ElevatedFilterChip(
+                                selected = false,
+                                onClick = { viewModel.loadSavedSearch(savedSearch) },
+                                label = { Text(savedSearch.name) },
+                                modifier = Modifier.combinedClickable(
+                                    onClick = { viewModel.loadSavedSearch(savedSearch) },
+                                    onLongClick = {
+                                        searchToDelete = savedSearch
+                                        showDeleteDialog = true
+                                    }
+                                ),
+                                leadingIcon = {
+                                    if (!uiState.filtersEnabled) {
+                                        Icon(
+                                            imageVector = Icons.Default.FilterList,
+                                            contentDescription = "Filter deaktiviert",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
-            // Suchfeld + Filter-Icon
+            
+            // Suchfeld mit Filter-Icon
             Row(verticalAlignment = Alignment.Bottom) {
                 OutlinedTextField(
                     value = uiState.query,
@@ -118,21 +146,32 @@ fun SearchScreen(
                                 modifier = Modifier
                                     .scale(filterIconScale)
                                     .background(
-                                        if (filterActive) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
+                                        if (filterActive && uiState.filtersEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
                                         shape = CircleShape
                                     )
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.FilterList,
                                     contentDescription = "Filter",
-                                    tint = if (filterActive) MaterialTheme.colorScheme.primary else Color.Gray
+                                    tint = when {
+                                        filterActive && uiState.filtersEnabled -> MaterialTheme.colorScheme.primary
+                                        !uiState.filtersEnabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        else -> Color.Gray
+                                    }
                                 )
                             }
-                            if (filterActive) {
+                            if (filterActive && uiState.filtersEnabled) {
                                 Box(
                                     modifier = Modifier
                                         .size(10.dp)
                                         .background(Color.Red, shape = CircleShape)
+                                        .align(Alignment.TopEnd)
+                                )
+                            } else if (!uiState.filtersEnabled) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(MaterialTheme.colorScheme.onSurfaceVariant, shape = CircleShape)
                                         .align(Alignment.TopEnd)
                                 )
                             }
@@ -140,7 +179,16 @@ fun SearchScreen(
                     }
                 )
             }
-
+            
+            // PLZ
+            OutlinedTextField(
+                value = uiState.postalCode,
+                onValueChange = viewModel::onPostalCodeChange,
+                label = { Text("Postleitzahl") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+            
             // Suche-Button
             Button(
                 onClick = { 
@@ -152,14 +200,17 @@ fun SearchScreen(
             ) {
                 Text("Preise vergleichen")
             }
+            
             // Fehler
             if (uiState.errorMessage != null) {
                 Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error)
             }
+            
             // Ladeanzeige
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
+            
             // Ergebnisliste
             if (!uiState.isLoading && uiState.errorMessage == null) {
                 if (uiState.searchResults.isNotEmpty()) {
@@ -184,6 +235,25 @@ fun SearchScreen(
                 }
             }
         }
+        
+        // Save Button (Floating Action Button)
+        if (uiState.showSaveButton) {
+            FloatingActionButton(
+                onClick = {
+                    saveSearchName = uiState.query // Vorausfüllen mit aktuellem Suchbegriff
+                    showSaveDialog = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Suche speichern"
+                )
+            }
+        }
+        
         // Filter-BottomSheet
         if (uiState.isFilterSheetOpen) {
             ModalBottomSheet(
@@ -196,13 +266,76 @@ fun SearchScreen(
                     onSelectedStoresChange = viewModel::onSelectedStoresChange,
                     onUnitChange = viewModel::onUnitChange,
                     onMaxPriceChange = viewModel::onMaxPriceChange,
-                    onPostalCodeChange = { newValue ->
-                        viewModel.onPostalCodeChange(newValue)
-                        onPostalCodeChanged(newValue)
-                    },
+                    onFiltersToggle = viewModel::toggleFilters,
                     onClose = { viewModel.openFilterSheet(false) }
                 )
             }
         }
+    }
+    
+    // Save Dialog
+    if (showSaveDialog) {
+        AlertDialog(
+            onDismissRequest = { showSaveDialog = false },
+            title = { Text("Suche speichern") },
+            text = {
+                Column {
+                    Text("Geben Sie einen Namen für die gespeicherte Suche ein:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = saveSearchName,
+                        onValueChange = { saveSearchName = it },
+                        label = { Text("Name") },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.saveCurrentSearch(saveSearchName)
+                        showSaveDialog = false
+                        saveSearchName = ""
+                    }
+                ) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSaveDialog = false }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
+    }
+    
+    // Delete Dialog
+    if (showDeleteDialog && searchToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Suche löschen") },
+            text = { Text("Möchten Sie die gespeicherte Suche \"${searchToDelete!!.name}\" wirklich löschen?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteSavedSearch(searchToDelete!!.id)
+                        showDeleteDialog = false
+                        searchToDelete = null
+                    }
+                ) {
+                    Text("Löschen")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showDeleteDialog = false
+                        searchToDelete = null
+                    }
+                ) {
+                    Text("Abbrechen")
+                }
+            }
+        )
     }
 } 

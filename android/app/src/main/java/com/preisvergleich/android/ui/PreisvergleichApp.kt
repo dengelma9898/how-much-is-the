@@ -49,9 +49,7 @@ fun PreisvergleichApp(
                 SearchScreen(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues),
-                    initialPostalCode = state.postalCode,
-                    onPostalCodeChanged = viewModel::updatePostalCode
+                        .padding(paddingValues)
                 )
             }
         }

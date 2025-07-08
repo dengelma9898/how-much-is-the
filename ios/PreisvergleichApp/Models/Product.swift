@@ -1,5 +1,32 @@
 import Foundation
 
+// MARK: - Saved Search Model
+struct SavedSearch: Codable, Identifiable {
+    let id: String
+    let name: String
+    let query: String
+    let postalCode: String
+    let selectedStores: [String]
+    let unit: String?
+    let maxPrice: Double?
+    let createdAt: Date
+    
+    init(name: String, query: String, postalCode: String, selectedStores: [String] = [], unit: String? = nil, maxPrice: Double? = nil) {
+        self.id = UUID().uuidString
+        self.name = name.isEmpty ? query : name
+        self.query = query
+        self.postalCode = postalCode
+        self.selectedStores = selectedStores
+        self.unit = unit
+        self.maxPrice = maxPrice
+        self.createdAt = Date()
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, query, postalCode, selectedStores, unit, maxPrice, createdAt
+    }
+}
+
 // MARK: - API Request Models
 struct SearchRequest: Codable {
     let query: String
