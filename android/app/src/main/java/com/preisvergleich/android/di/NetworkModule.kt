@@ -1,12 +1,15 @@
 package com.preisvergleich.android.di
 
+import android.content.Context
 import com.preisvergleich.android.data.network.ApiService
+import com.preisvergleich.android.data.preferences.PreferencesRepository
 import com.preisvergleich.android.data.repository.SearchRepository
 import com.preisvergleich.android.data.repository.SearchRepositoryImpl
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -69,6 +72,12 @@ abstract class NetworkModule {
         @Singleton
         fun provideApiService(retrofit: Retrofit): ApiService {
             return retrofit.create(ApiService::class.java)
+        }
+
+        @Provides
+        @Singleton
+        fun providePreferencesRepository(@ApplicationContext context: Context): PreferencesRepository {
+            return PreferencesRepository(context)
         }
     }
 } 

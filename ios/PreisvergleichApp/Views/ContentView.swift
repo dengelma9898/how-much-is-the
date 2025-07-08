@@ -2,9 +2,44 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = SearchViewModel()
+    @State private var isOnboardingCompleted = UserDefaults.standard.bool(forKey: "isOnboardingCompleted")
+    @State private var savedPostalCode = UserDefaults.standard.string(forKey: "postalCode") ?? ""
     @State private var showFilterSheet = false
+    @State private var showOnboarding = false
+    @State private var showPostalCodeSetup = false
     
     var body: some View {
+        Group {
+            if showOnboarding {
+                SimpleOnboardingView { 
+                    showOnboarding = false
+                }
+            } else if showPostalCodeSetup {
+                SimplePostalCodeSetupView { postalCode in
+                    if !postalCode.isEmpty {
+                        UserDefaults.standard.set(postalCode, forKey: "postalCode")
+                        savedPostalCode = postalCode
+                        viewModel.postalCode = postalCode
+                    }
+                    showPostalCodeSetup = false
+                }
+            } else {
+                mainContentView
+            }
+        }
+        .onAppear {
+            setupInitialState()
+        }
+        .onChange(of: showOnboarding) { _, newValue in
+            if !newValue {
+                UserDefaults.standard.set(true, forKey: "isOnboardingCompleted")
+                isOnboardingCompleted = true
+                checkPostalCodeSetup()
+            }
+        }
+    }
+    
+    private var mainContentView: some View {
         NavigationView {
             VStack(spacing: 20) {
                 // Header
@@ -72,16 +107,7 @@ struct ContentView: View {
                         }
                     }
                     
-                    // Postal Code Input
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Postleitzahl")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        TextField("z.B. 10115", text: $viewModel.postalCode)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .keyboardType(.numberPad)
-                    }
+
                     
                     // Search Button
                     Button(action: {
@@ -110,7 +136,7 @@ struct ContentView: View {
                         )
                         .cornerRadius(12)
                     }
-                    .disabled(viewModel.isLoading || viewModel.searchQuery.isEmpty || viewModel.postalCode.isEmpty)
+                    .disabled(viewModel.isLoading || viewModel.searchQuery.isEmpty)
                 }
                 .padding(.horizontal)
                 
@@ -142,7 +168,7 @@ struct ContentView: View {
                             .fontWeight(.medium)
                             .foregroundColor(.primary)
                         
-                        Text("Geben Sie ein Produkt und Ihre Postleitzahl ein, um die besten Preise zu finden.")
+                        Text("Geben Sie ein Produkt ein, um die besten Preise zu finden.")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -194,6 +220,27 @@ struct ContentView: View {
                                 }
                             }
                         }
+                        
+                        // Postleitzahl
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Postleitzahl")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            HStack {
+                                TextField("z.B. 10115", text: $viewModel.postalCode)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .keyboardType(.numberPad)
+                                
+                                Button("Ändern") {
+                                    UserDefaults.standard.set(viewModel.postalCode, forKey: "postalCode")
+                                    savedPostalCode = viewModel.postalCode
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(viewModel.postalCode.count != 5)
+                            }
+                        }
+                        
                         // Einheit
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Einheit filtern (optional)")
@@ -242,6 +289,26 @@ struct ContentView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+        }
+    }
+    
+    // MARK: - Setup Methods
+    private func setupInitialState() {
+        if !isOnboardingCompleted {
+            showOnboarding = true
+        } else if savedPostalCode.isEmpty {
+            showPostalCodeSetup = true
+        } else {
+            // Initialize with saved postal code
+            viewModel.postalCode = savedPostalCode
+        }
+    }
+    
+    private func checkPostalCodeSetup() {
+        if savedPostalCode.isEmpty {
+            showPostalCodeSetup = true
+        } else {
+            viewModel.postalCode = savedPostalCode
         }
     }
 }
@@ -296,6 +363,217 @@ struct ProductRowView: View {
         .shadow(color: .gray.opacity(0.2), radius: 4, x: 0, y: 2)
     }
 }
+
+// MARK: - Simple Onboarding Views
+
+struct SimpleOnboardingView: View {
+    let onCompleted: () -> Void
+    @State private var currentPage = 0
+    
+    private let pages = [
+        ("Preise vergleichen", "Finden Sie die besten Preise für Ihre Lieblings-Produkte in deutschen Supermärkten.", "magnifyingglass"),
+        ("Geld sparen", "Sparen Sie bei jedem Einkauf Geld durch intelligente Preisvergleiche.", "banknote"),
+        ("Einfach & schnell", "Suchen Sie einfach nach Produkten und finden Sie sofort die günstigsten Angebote in Ihrer Nähe.", "bolt.fill")
+    ]
+    
+    var body: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Button("Überspringen") {
+                    onCompleted()
+                }
+                .foregroundColor(.primary)
+                .padding()
+            }
+            
+            TabView(selection: $currentPage) {
+                ForEach(0..<pages.count, id: \.self) { index in
+                    VStack(spacing: 40) {
+                        Spacer()
+                        
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.2))
+                                .frame(width: 120, height: 120)
+                            
+                            Image(systemName: pages[index].2)
+                                .font(.system(size: 50))
+                                .foregroundColor(.blue)
+                        }
+                        
+                        VStack(spacing: 16) {
+                            Text(pages[index].0)
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.primary)
+                            
+                            Text(pages[index].1)
+                                .font(.body)
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 32)
+                        }
+                        
+                        Spacer()
+                    }
+                    .tag(index)
+                }
+            }
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            
+            HStack(spacing: 8) {
+                ForEach(0..<pages.count, id: \.self) { index in
+                    Circle()
+                        .fill(currentPage == index ? Color.primary : Color.gray.opacity(0.4))
+                        .frame(width: currentPage == index ? 12 : 8, height: currentPage == index ? 12 : 8)
+                        .animation(.easeInOut(duration: 0.3), value: currentPage)
+                }
+            }
+            .padding(.vertical)
+            
+            HStack {
+                if currentPage > 0 {
+                    Button("Zurück") {
+                        withAnimation { currentPage -= 1 }
+                    }
+                    .foregroundColor(.primary)
+                } else {
+                    Spacer()
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    if currentPage < pages.count - 1 {
+                        withAnimation { currentPage += 1 }
+                    } else {
+                        onCompleted()
+                    }
+                }) {
+                    Text(currentPage < pages.count - 1 ? "Weiter" : "Los geht's!")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 30)
+                        .padding(.vertical, 12)
+                        .background(LinearGradient(gradient: Gradient(colors: [.blue, .purple]), startPoint: .leading, endPoint: .trailing))
+                        .cornerRadius(25)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 30)
+        }
+        .background(Color(.systemBackground))
+    }
+}
+
+struct SimplePostalCodeSetupView: View {
+    @State private var postalCode = ""
+    @State private var isError = false
+    @FocusState private var isTextFieldFocused: Bool
+    
+    let onComplete: (String) -> Void
+    
+    var body: some View {
+        VStack(spacing: 30) {
+            Spacer()
+            
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.2))
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue)
+            }
+            
+            VStack(spacing: 16) {
+                Text("Ihre Postleitzahl")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.primary)
+                
+                Text("Geben Sie Ihre Postleitzahl ein, um lokale Angebote und Supermärkte in Ihrer Nähe zu finden.")
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 32)
+            }
+            
+            VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("z.B. 10115", text: $postalCode)
+                        .keyboardType(.numberPad)
+                        .focused($isTextFieldFocused)
+                        .onChange(of: postalCode) { _, newValue in
+                            let filtered = newValue.filter { $0.isNumber }
+                            if filtered.count <= 5 {
+                                postalCode = filtered
+                                isError = false
+                            } else {
+                                postalCode = String(filtered.prefix(5))
+                            }
+                        }
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(isError ? Color.red : Color.clear, lineWidth: 1)
+                        )
+                    
+                    if isError {
+                        Text("Bitte geben Sie eine gültige 5-stellige Postleitzahl ein")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.horizontal, 24)
+                
+                Button(action: {
+                    if postalCode.count == 5 {
+                        onComplete(postalCode)
+                    } else {
+                        isError = true
+                    }
+                }) {
+                    Text("Weiter")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(LinearGradient(gradient: Gradient(colors: [.blue, .purple]), startPoint: .leading, endPoint: .trailing))
+                        .cornerRadius(12)
+                        .opacity(postalCode.isEmpty ? 0.6 : 1.0)
+                }
+                .disabled(postalCode.isEmpty)
+                .padding(.horizontal, 24)
+                
+                Button("Später eingeben") {
+                    onComplete("")
+                }
+                .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .background(Color(.systemBackground))
+        .onAppear {
+            isTextFieldFocused = true
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Fertig") {
+                    isTextFieldFocused = false
+                }
+            }
+        }
+    }
+}
+
+
 
 #Preview {
     ContentView()

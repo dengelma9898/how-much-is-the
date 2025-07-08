@@ -28,8 +28,16 @@ import java.math.BigDecimal
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialPostalCode: String? = null,
+    onPostalCodeChanged: (String) -> Unit = {}
 ) {
+    // Initialize postal code when screen is first composed
+    LaunchedEffect(initialPostalCode) {
+        initialPostalCode?.let { 
+            viewModel.onPostalCodeChange(it)
+        }
+    }
     val uiState by viewModel.uiState.collectAsState()
     val focusManager = LocalFocusManager.current
     val filterActive = uiState.selectedStores.isNotEmpty() || uiState.unit != null || uiState.maxPrice != null
@@ -132,14 +140,7 @@ fun SearchScreen(
                     }
                 )
             }
-            // PLZ
-            OutlinedTextField(
-                value = uiState.postalCode,
-                onValueChange = viewModel::onPostalCodeChange,
-                label = { Text("Postleitzahl") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
+
             // Suche-Button
             Button(
                 onClick = { 
@@ -195,6 +196,10 @@ fun SearchScreen(
                     onSelectedStoresChange = viewModel::onSelectedStoresChange,
                     onUnitChange = viewModel::onUnitChange,
                     onMaxPriceChange = viewModel::onMaxPriceChange,
+                    onPostalCodeChange = { newValue ->
+                        viewModel.onPostalCodeChange(newValue)
+                        onPostalCodeChanged(newValue)
+                    },
                     onClose = { viewModel.openFilterSheet(false) }
                 )
             }
