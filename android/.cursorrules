@@ -1,0 +1,50 @@
+# Android Cursor Rules
+
+## Framework und Dependencies
+- Verwende Kotlin als Programmiersprache
+- Nutze Jetpack Compose für moderne UI
+- Verwende Material3 Design System
+- Implementiere MVVM-Architektur mit ViewModel
+- Nutze Retrofit für HTTP-Requests
+- Verwende Hilt für Dependency Injection
+- Nutze Room für lokale Datenspeicherung
+- Verwende Coroutines und Flow für asynchrone Programmierung
+
+## Code-Struktur
+- Organisiere Code nach Feature-Modulen
+- Verwende Clean Architecture-Prinzipien
+- Implementiere Repository-Pattern für Datenquellen
+- Nutze UseCase-Klassen für Business Logic
+- Separiere UI-State von Business Logic
+
+## UI/UX Design
+- Folge Material Design 3 Richtlinien
+- Implementiere Dark/Light Theme Support
+- Nutze Adaptive Icons und Splash Screens
+- Implementiere Proper Navigation mit Navigation Compose
+- Verwende semantische Compose-Funktionen
+
+## Performance
+- Nutze remember und derivedStateOf für State-Management
+- Implementiere Lazy Loading für Listen
+- Verwende CompositionLocal für Theme-Daten
+- Optimiere Recompositions
+
+## Testing
+- Schreibe Unit Tests für ViewModels und UseCases
+- Nutze Compose Testing für UI-Tests
+- Verwende MockK für Mocking
+- Implementiere Instrumented Tests für kritische Flows
+
+## Best Practices
+- Nutze Type-Safe Navigation
+- Implementiere Proper Error Handling
+- Verwende Sealed Classes für UI-States
+- Folge Kotlin Coding Conventions
+- Dokumentiere öffentliche APIs mit KDoc
+
+## Security
+- Speichere sensible Daten sicher (Encrypted SharedPreferences)
+- Validiere alle Benutzereingaben
+- Nutze Network Security Config
+- Implementiere Certificate Pinning für API-Calls 

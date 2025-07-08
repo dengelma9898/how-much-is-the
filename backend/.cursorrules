@@ -1,0 +1,36 @@
+# Python Backend Cursor Rules
+
+## Framework und Dependencies
+- Verwende FastAPI als Web-Framework
+- Nutze Pydantic für Datenvalidierung und Serialisierung
+- Verwende uvicorn als ASGI-Server
+- Integriere firecrawl-py für Web-Scraping
+- Nutze httpx für asynchrone HTTP-Requests
+
+## Code-Struktur
+- Verwende async/await für alle API-Endpunkte
+- Implementiere saubere Trennung von Controllern, Services und Models
+- Nutze Type Hints für alle Funktionen und Variablen
+- Organisiere Code in Module: app/, models/, services/, utils/
+
+## API-Design
+- Nutze RESTful API-Prinzipien
+- Implementiere automatische OpenAPI/Swagger-Dokumentation
+- Verwende Pydantic-Modelle für Request/Response-Validierung
+- Implementiere ordentliche Error-Handling mit HTTP-Status-Codes
+
+## Sicherheit
+- Validiere alle Eingaben mit Pydantic
+- Implementiere CORS-Middleware für Cross-Origin-Requests
+- Nutze Environment-Variablen für sensible Konfiguration
+
+## Testing
+- Schreibe Tests mit pytest und pytest-asyncio
+- Nutze TestClient für API-Tests
+- Verwende Mock-Daten für Entwicklung und Tests
+
+## Best Practices
+- Folge PEP 8 für Code-Stil
+- Verwende aussagekräftige Variablen- und Funktionsnamen
+- Dokumentiere komplexe Funktionen mit Docstrings
+- Implementiere Logging für Debugging und Monitoring 

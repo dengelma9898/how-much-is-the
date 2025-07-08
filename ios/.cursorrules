@@ -1,0 +1,55 @@
+# iOS Cursor Rules
+
+## Framework und Dependencies
+- Verwende Swift als Programmiersprache
+- Nutze SwiftUI für moderne UI
+- Implementiere MVVM-Architektur mit ObservableObject
+- Verwende URLSession für HTTP-Requests
+- Nutze UserDefaults für lokale Datenspeicherung
+- Verwende Combine für reaktive Programmierung
+- Implementiere Core Data für komplexere Datenpersistenz
+
+## Code-Struktur
+- Organisiere Code nach Feature-Modulen
+- Verwende Clean Architecture-Prinzipien
+- Implementiere Repository-Pattern für Datenquellen
+- Nutze Service-Klassen für Business Logic
+- Separiere UI-State von Business Logic
+
+## UI/UX Design
+- Folge Apple Human Interface Guidelines
+- Implementiere Dark/Light Mode Support
+- Nutze System Colors und SF Symbols
+- Implementiere Native Navigation mit NavigationStack
+- Verwende semantische SwiftUI-Komponenten
+
+## Performance
+- Nutze @StateObject, @ObservedObject, @State korrekt
+- Implementiere Lazy Loading für Listen
+- Verwende @EnvironmentObject für geteilte Daten
+- Optimiere View-Updates
+
+## Testing
+- Schreibe Unit Tests für ViewModels und Services
+- Nutze XCTest für UI-Tests
+- Verwende Mock-Objekte für Isolation
+- Implementiere Snapshot-Tests für UI-Konsistenz
+
+## Best Practices
+- Nutze Type-Safe Navigation
+- Implementiere Proper Error Handling
+- Verwende Result-Type für API-Responses
+- Folge Swift Coding Guidelines
+- Dokumentiere öffentliche APIs mit Swift Documentation
+
+## Security
+- Speichere sensible Daten sicher (Keychain)
+- Validiere alle Benutzereingaben
+- Nutze App Transport Security
+- Implementiere Certificate Pinning für API-Calls
+
+## iOS-spezifische Features
+- Unterstütze Dynamic Type für Accessibility
+- Implementiere VoiceOver-Support
+- Nutze iOS-native Komponenten wie ActionSheet, Alert
+- Verwende iOS-Designpatterns wie Coordinator Pattern 

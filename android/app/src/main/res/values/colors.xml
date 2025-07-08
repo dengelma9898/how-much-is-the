@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main brand colors inspired by the app icon -->
+    <color name="green_primary">#4CAF50</color>
+    <color name="green_primary_variant">#388E3C</color>
+    <color name="green_secondary">#81C784</color>
+    <color name="green_light">#C8E6C9</color>
+    
+    <color name="yellow_accent">#FFC107</color>
+    <color name="yellow_light">#FFF9C4</color>
+    <color name="yellow_dark">#FF8F00</color>
+    
+    <!-- Material 3 color scheme -->
+    <color name="md_theme_light_primary">#2D5016</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+    <color name="md_theme_light_primaryContainer">#AED993</color>
+    <color name="md_theme_light_onPrimaryContainer">#002200</color>
+    
+    <color name="md_theme_light_secondary">#54634D</color>
+    <color name="md_theme_light_onSecondary">#FFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">#D7E8CD</color>
+    <color name="md_theme_light_onSecondaryContainer">#121F0E</color>
+    
+    <color name="md_theme_light_tertiary">#386568</color>
+    <color name="md_theme_light_onTertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiaryContainer">#BCEBEF</color>
+    <color name="md_theme_light_onTertiaryContainer">#002022</color>
+    
+    <color name="md_theme_light_error">#BA1A1A</color>
+    <color name="md_theme_light_errorContainer">#FFDAD6</color>
+    <color name="md_theme_light_onError">#FFFFFF</color>
+    <color name="md_theme_light_onErrorContainer">#410002</color>
+    
+    <color name="md_theme_light_background">#FCFCF6</color>
+    <color name="md_theme_light_onBackground">#1A1C18</color>
+    <color name="md_theme_light_surface">#FCFCF6</color>
+    <color name="md_theme_light_onSurface">#1A1C18</color>
+    
+    <color name="md_theme_light_surfaceVariant">#DFE4D7</color>
+    <color name="md_theme_light_onSurfaceVariant">#43483F</color>
+    <color name="md_theme_light_outline">#73796E</color>
+    <color name="md_theme_light_inverseOnSurface">#F1F1EB</color>
+    <color name="md_theme_light_inverseSurface">#2F312D</color>
+    <color name="md_theme_light_inversePrimary">#93BD79</color>
+    
+    <!-- Dark theme colors -->
+    <color name="md_theme_dark_primary">#93BD79</color>
+    <color name="md_theme_dark_onPrimary">#0A3900</color>
+    <color name="md_theme_dark_primaryContainer">#1E4409</color>
+    <color name="md_theme_dark_onPrimaryContainer">#AED993</color>
+    
+    <color name="md_theme_dark_secondary">#BBCCB1</color>
+    <color name="md_theme_dark_onSecondary">#263422</color>
+    <color name="md_theme_dark_secondaryContainer">#3C4B37</color>
+    <color name="md_theme_dark_onSecondaryContainer">#D7E8CD</color>
+    
+    <color name="md_theme_dark_tertiary">#A0CFD3</color>
+    <color name="md_theme_dark_onTertiary">#003739</color>
+    <color name="md_theme_dark_tertiaryContainer">#1F4E50</color>
+    <color name="md_theme_dark_onTertiaryContainer">#BCEBEF</color>
+    
+    <color name="md_theme_dark_error">#FFB4AB</color>
+    <color name="md_theme_dark_errorContainer">#93000A</color>
+    <color name="md_theme_dark_onError">#690005</color>
+    <color name="md_theme_dark_onErrorContainer">#FFDAD6</color>
+    
+    <color name="md_theme_dark_background">#1A1C18</color>
+    <color name="md_theme_dark_onBackground">#E3E3DD</color>
+    <color name="md_theme_dark_surface">#1A1C18</color>
+    <color name="md_theme_dark_onSurface">#E3E3DD</color>
+    
+    <color name="md_theme_dark_surfaceVariant">#43483F</color>
+    <color name="md_theme_dark_onSurfaceVariant">#C3C8BC</color>
+    <color name="md_theme_dark_outline">#8D9387</color>
+    <color name="md_theme_dark_inverseOnSurface">#1A1C18</color>
+    <color name="md_theme_dark_inverseSurface">#E3E3DD</color>
+    <color name="md_theme_dark_inversePrimary">#2D5016</color>
+    
+    <!-- Additional colors -->
+    <color name="seed">#4CAF50</color>
+    <color name="price_green">#1B5E20</color>
+    <color name="availability_green">#4CAF50</color>
+    <color name="unavailable_red">#F44336</color>
+</resources> 
