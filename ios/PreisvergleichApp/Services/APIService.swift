@@ -1,6 +1,49 @@
 import Foundation
 import Combine
 
+// MARK: - API Request Models
+struct SearchRequest: Codable {
+    let query: String
+    let postalCode: String
+    let selectedStores: [String]?
+    let unit: String?
+    let maxPrice: Double?
+    
+    enum CodingKeys: String, CodingKey {
+        case query
+        case postalCode = "postal_code"
+        case selectedStores = "selected_stores"
+        case unit
+        case maxPrice = "max_price"
+    }
+}
+
+// MARK: - API Response Models
+struct StoresResponse: Codable {
+    let stores: [Store]
+}
+
+// MARK: - API Error
+enum APIError: Error, LocalizedError {
+    case invalidURL
+    case noData
+    case decodingError(Error)
+    case networkError(Error)
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            return "Ungültige URL"
+        case .noData:
+            return "Keine Daten erhalten"
+        case .decodingError(let error):
+            return "Dekodierungsfehler: \(error.localizedDescription)"
+        case .networkError(let error):
+            return "Netzwerkfehler: \(error.localizedDescription)"
+        }
+    }
+}
+
 class APIService: ObservableObject {
     static let shared = APIService()
     
