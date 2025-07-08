@@ -336,149 +336,198 @@ struct ContentView: View {
     // MARK: - Filter Sheet View
     private var filterSheetView: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Filter Toggle
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Filter aktivieren")
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Filter Toggle
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Filter aktivieren")
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                Text("Filter außer Postleitzahl können deaktiviert werden")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $viewModel.filtersEnabled)
+                                .tint(.blue)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                    }
+                    
+                    // Store Multi-Select
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Supermärkte filtern")
                                 .font(.subheadline)
-                                .foregroundColor(.primary)
-                            Text("Filter außer Postleitzahl können deaktiviert werden")
+                                .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
+                            Spacer()
+                            Text("(\(viewModel.stores.count) verfügbar)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        Spacer()
-                        Toggle("", isOn: $viewModel.filtersEnabled)
-                            .tint(.blue)
-                    }
-                    .padding(.vertical, 8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                }
-                
-                // Store Multi-Select
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Supermärkte filtern")
-                        .font(.subheadline)
-                        .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(viewModel.stores, id: \.storeId) { store in
-                                let isSelected = viewModel.selectedStoreIds.contains(store.storeId)
-                                Button(action: {
-                                    if viewModel.filtersEnabled {
-                                        if isSelected {
-                                            viewModel.selectedStoreIds.removeAll { $0 == store.storeId }
-                                        } else {
-                                            viewModel.selectedStoreIds.append(store.storeId)
-                                        }
-                                    }
-                                }) {
-                                    HStack(spacing: 4) {
-                                        if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
-                                            AsyncImage(url: url) { image in
-                                                image.resizable().scaledToFit()
-                                            } placeholder: {
-                                                Color.gray.opacity(0.2)
+                        
+                        if viewModel.stores.isEmpty {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Lade Supermärkte...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 20)
+                        } else {
+                            LazyVGrid(columns: [
+                                GridItem(.adaptive(minimum: 80), spacing: 8)
+                            ], spacing: 8) {
+                                ForEach(viewModel.stores, id: \.storeId) { store in
+                                    let isSelected = viewModel.selectedStoreIds.contains(store.storeId)
+                                    Button(action: {
+                                        if viewModel.filtersEnabled {
+                                            if isSelected {
+                                                viewModel.selectedStoreIds.removeAll { $0 == store.storeId }
+                                            } else {
+                                                viewModel.selectedStoreIds.append(store.storeId)
                                             }
-                                            .frame(width: 20, height: 20)
-                                            .clipShape(Circle())
                                         }
-                                        Text(store.name)
-                                            .font(.caption)
-                                            .foregroundColor(getStoreTextColor(isSelected: isSelected))
+                                    }) {
+                                        VStack(spacing: 4) {
+                                            if let logoUrl = store.logoUrl, let url = URL(string: logoUrl) {
+                                                AsyncImage(url: url) { image in
+                                                    image.resizable().scaledToFit()
+                                                } placeholder: {
+                                                    Circle()
+                                                        .fill(Color.gray.opacity(0.2))
+                                                        .frame(width: 30, height: 30)
+                                                }
+                                                .frame(width: 30, height: 30)
+                                                .clipShape(Circle())
+                                            } else {
+                                                Circle()
+                                                    .fill(Color.blue.opacity(0.2))
+                                                    .frame(width: 30, height: 30)
+                                                    .overlay(
+                                                        Text(String(store.name.prefix(1)))
+                                                            .font(.caption)
+                                                            .fontWeight(.bold)
+                                                            .foregroundColor(.blue)
+                                                    )
+                                            }
+                                            Text(store.name)
+                                                .font(.caption)
+                                                .foregroundColor(getStoreTextColor(isSelected: isSelected))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.8)
+                                        }
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 4)
+                                        .frame(maxWidth: .infinity)
+                                        .background(getStoreBackgroundColor(isSelected: isSelected))
+                                        .cornerRadius(12)
+                                        .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
                                     }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(getStoreBackgroundColor(isSelected: isSelected))
-                                    .cornerRadius(16)
-                                    .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
+                                    .disabled(!viewModel.filtersEnabled)
                                 }
-                                .disabled(!viewModel.filtersEnabled)
                             }
                         }
                     }
-                }
-                
-                // Postleitzahl
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Postleitzahl")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
                     
-                    HStack {
-                        TextField("z.B. 10115", text: $viewModel.postalCode)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .keyboardType(.numberPad)
+                    Divider()
+                    
+                    // Postleitzahl
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Postleitzahl")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
                         
-                        Button("Ändern") {
-                            UserDefaults.standard.set(viewModel.postalCode, forKey: "postalCode")
-                            savedPostalCode = viewModel.postalCode
+                        HStack {
+                            TextField("z.B. 10115", text: $viewModel.postalCode)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .keyboardType(.numberPad)
+                            
+                            Button("Ändern") {
+                                UserDefaults.standard.set(viewModel.postalCode, forKey: "postalCode")
+                                savedPostalCode = viewModel.postalCode
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(viewModel.postalCode.count != 5)
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(viewModel.postalCode.count != 5)
                     }
-                }
-                
-                // Einheit
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Einheit filtern (optional)")
-                        .font(.subheadline)
-                        .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
-                    TextField("z.B. 1L, 500g", text: Binding(
-                        get: { viewModel.selectedUnit ?? "" },
-                        set: { newValue in
-                            if viewModel.filtersEnabled {
-                                viewModel.selectedUnit = newValue.isEmpty ? nil : newValue
-                            }
-                        }
-                    ))
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .disabled(!viewModel.filtersEnabled)
-                    .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
-                }
-                
-                // Maximalpreis
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Maximalpreis (optional)")
-                        .font(.subheadline)
-                        .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
-                    HStack {
-                        Slider(value: Binding(
-                            get: { viewModel.maxPrice ?? 10.0 },
+                    
+                    // Einheit
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Einheit filtern (optional)")
+                            .font(.subheadline)
+                            .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
+                        TextField("z.B. 1L, 500g", text: Binding(
+                            get: { viewModel.selectedUnit ?? "" },
                             set: { newValue in
                                 if viewModel.filtersEnabled {
-                                    viewModel.maxPrice = newValue
-                                }
-                            }
-                        ), in: 0...10, step: 0.1)
-                        .disabled(!viewModel.filtersEnabled)
-                        .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
-                        
-                        TextField("", text: Binding(
-                            get: { viewModel.maxPrice != nil ? String(format: "%.2f", viewModel.maxPrice!) : "" },
-                            set: { newValue in
-                                if viewModel.filtersEnabled {
-                                    viewModel.maxPrice = Double(newValue.replacingOccurrences(of: ",", with: "."))
+                                    viewModel.selectedUnit = newValue.isEmpty ? nil : newValue
                                 }
                             }
                         ))
-                        .frame(width: 60)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .keyboardType(.decimalPad)
                         .disabled(!viewModel.filtersEnabled)
                         .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
-                        
-                        Text("€")
-                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Maximalpreis
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Maximalpreis (optional)")
+                            .font(.subheadline)
+                            .foregroundColor(viewModel.filtersEnabled ? .secondary : .gray)
+                        HStack {
+                            VStack {
+                                Slider(value: Binding(
+                                    get: { viewModel.maxPrice ?? 10.0 },
+                                    set: { newValue in
+                                        if viewModel.filtersEnabled {
+                                            viewModel.maxPrice = newValue
+                                        }
+                                    }
+                                ), in: 0...10, step: 0.1)
+                                .disabled(!viewModel.filtersEnabled)
+                                .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
+                                
+                                HStack {
+                                    Text("0€")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("10€")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            TextField("", text: Binding(
+                                get: { viewModel.maxPrice != nil ? String(format: "%.2f", viewModel.maxPrice!) : "" },
+                                set: { newValue in
+                                    if viewModel.filtersEnabled {
+                                        viewModel.maxPrice = Double(newValue.replacingOccurrences(of: ",", with: "."))
+                                    }
+                                }
+                            ))
+                            .frame(width: 60)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .keyboardType(.decimalPad)
+                            .disabled(!viewModel.filtersEnabled)
+                            .opacity(viewModel.filtersEnabled ? 1.0 : 0.5)
+                            
+                            Text("€")
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
             .navigationTitle("Filter")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Schließen") { showFilterSheet = false }

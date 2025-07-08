@@ -64,15 +64,20 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Load Stores
     private func loadStores() {
+        print("📊 Loading stores from API...")
         apiService.getStores()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in
                     if case .failure(let error) = completion {
-                        print("Fehler beim Laden der Stores: \(error)")
+                        print("❌ Fehler beim Laden der Stores: \(error)")
                     }
                 },
                 receiveValue: { [weak self] stores in
+                    print("✅ Stores geladen: \(stores.count) Stores")
+                    for store in stores {
+                        print("  - \(store.name) (ID: \(store.storeId))")
+                    }
                     self?.stores = stores
                 }
             )
