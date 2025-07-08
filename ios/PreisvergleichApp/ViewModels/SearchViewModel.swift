@@ -12,13 +12,18 @@ class SearchViewModel: ObservableObject {
     @Published var selectedStoreIds: [String] = []
     @Published var selectedUnit: String? = nil
     @Published var maxPrice: Double? = nil
+    @Published var savedSearches: [SavedSearch] = []
+    @Published var filtersEnabled = true
+    @Published var showSaveButton = false
     
     private let apiService = APIService.shared
     private var cancellables = Set<AnyCancellable>()
+    private let savedSearchesKey = "saved_searches"
     
     init() {
         loadPostalCode()
         loadStores()
+        loadSavedSearches()
     }
     
     // MARK: - Search Products
@@ -31,13 +36,14 @@ class SearchViewModel: ObservableObject {
         
         isLoading = true
         errorMessage = nil
+        showSaveButton = false
         
         apiService.searchProducts(
             query: searchQuery,
             postalCode: postalCode,
-            selectedStores: selectedStoreIds.isEmpty ? nil : selectedStoreIds,
-            unit: selectedUnit,
-            maxPrice: maxPrice
+            selectedStores: filtersEnabled && !selectedStoreIds.isEmpty ? selectedStoreIds : nil,
+            unit: filtersEnabled ? selectedUnit : nil,
+            maxPrice: filtersEnabled ? maxPrice : nil
         )
         .receive(on: DispatchQueue.main)
         .sink(
@@ -50,6 +56,7 @@ class SearchViewModel: ObservableObject {
             receiveValue: { [weak self] response in
                 self?.products = response.results
                 self?.savePostalCode()
+                self?.showSaveButton = !response.results.isEmpty
             }
         )
         .store(in: &cancellables)
@@ -57,15 +64,20 @@ class SearchViewModel: ObservableObject {
     
     // MARK: - Load Stores
     private func loadStores() {
+        print("📊 Loading stores from API...")
         apiService.getStores()
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in
                     if case .failure(let error) = completion {
-                        print("Fehler beim Laden der Stores: \(error)")
+                        print("❌ Fehler beim Laden der Stores: \(error)")
                     }
                 },
                 receiveValue: { [weak self] stores in
+                    print("✅ Stores geladen: \(stores.count) Stores")
+                    for store in stores {
+                        print("  - \(store.name) (ID: \(store.storeId))")
+                    }
                     self?.stores = stores
                 }
             )
@@ -79,6 +91,66 @@ class SearchViewModel: ObservableObject {
     
     private func savePostalCode() {
         UserDefaults.standard.set(postalCode, forKey: "saved_postal_code")
+    }
+    
+    // MARK: - Saved Searches
+    private func loadSavedSearches() {
+        if let data = UserDefaults.standard.data(forKey: savedSearchesKey),
+           let searches = try? JSONDecoder().decode([SavedSearch].self, from: data) {
+            savedSearches = searches
+        }
+    }
+    
+    private func saveSavedSearches() {
+        if let data = try? JSONEncoder().encode(savedSearches) {
+            UserDefaults.standard.set(data, forKey: savedSearchesKey)
+        }
+    }
+    
+    func saveCurrentSearch(name: String) {
+        let newSearch = SavedSearch(
+            name: name,
+            query: searchQuery,
+            postalCode: postalCode,
+            selectedStores: selectedStoreIds,
+            unit: selectedUnit,
+            maxPrice: maxPrice
+        )
+        
+        savedSearches.append(newSearch)
+        saveSavedSearches()
+        showSaveButton = false
+    }
+    
+    func loadSavedSearch(_ savedSearch: SavedSearch) {
+        searchQuery = savedSearch.query
+        postalCode = savedSearch.postalCode
+        
+        if filtersEnabled {
+            selectedStoreIds = savedSearch.selectedStores
+            selectedUnit = savedSearch.unit
+            maxPrice = savedSearch.maxPrice
+        } else {
+            selectedStoreIds = []
+            selectedUnit = nil
+            maxPrice = nil
+        }
+        
+        // Automatisch suchen nach dem Laden
+        searchProducts()
+    }
+    
+    func deleteSavedSearch(_ search: SavedSearch) {
+        savedSearches.removeAll { $0.id == search.id }
+        saveSavedSearches()
+    }
+    
+    func toggleFilters() {
+        filtersEnabled.toggle()
+    }
+    
+    func hideSaveButton() {
+        showSaveButton = false
     }
     
     // MARK: - Helpers
