@@ -1,10 +1,23 @@
+# Core FastAPI Dependencies
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 pydantic==2.10.3
 pydantic-settings==2.6.1
-firecrawl-py==0.0.20
-httpx==0.28.1
+
+# Web Scraping - Playwright Only (Standard Crawler)
+playwright==1.53.0
+
+# HTTP Client für ALDI-Crawler
+aiohttp==3.10.11
+
+# HTML Parsing für ALDI-Crawler
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# Utilities
 python-multipart==0.0.20
 python-dotenv==1.0.1
+
+# Testing
 pytest==8.3.3
 pytest-asyncio==0.24.0 
