@@ -4,6 +4,8 @@ from typing import List
 from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
 from app.services.mock_data import mock_data_service
 from app.services.aldi_crawler import create_aldi_crawler
+from app.services.lidl_crawler_bs4 import create_intelligent_lidl_crawler
+from app.services.lidl_mock_data import LidlMockData
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,9 @@ class SearchService:
         
         # Initialisiere Aldi-Crawler falls verfügbar
         self.aldi_crawler = create_aldi_crawler()
+        
+        # Initialisiere intelligenten Lidl-Crawler (BeautifulSoup + Ollama)
+        self.lidl_crawler = create_intelligent_lidl_crawler()
         
         # Legacy Firecrawl-Initialisierung für Fallback
         if self.firecrawl_enabled and settings.firecrawl_api_key:
@@ -57,10 +62,18 @@ class SearchService:
         # Simuliere API-Delay
         await self._simulate_delay()
         
+        # Verwende Mock-Daten von REWE/etc.
         results = mock_data_service.search_products(
             query=search_request.query,
             postal_code=search_request.postal_code
         )
+
+        # Ergänze Lidl Mock-Daten
+        lidl_results = LidlMockData.get_products_for_query(
+            query=search_request.query,
+            max_results=10
+        )
+        results.extend(lidl_results)
 
         # Filter: selected_stores
         if search_request.selected_stores:
@@ -79,8 +92,14 @@ class SearchService:
         try:
             results = []
             
-            # Verwende Aldi-Crawler falls verfügbar
-            if self.aldi_crawler:
+            # Prüfe Store-Filter für Aldi
+            should_search_aldi = (
+                not search_request.selected_stores or 
+                any(store.lower() in ['aldi', 'aldi süd', 'aldi-süd'] for store in search_request.selected_stores)
+            )
+            
+            # Verwende Aldi-Crawler falls verfügbar und gewünscht
+            if self.aldi_crawler and should_search_aldi:
                 logger.info(f"Crawle Aldi-Produkte für Query: {search_request.query}")
                 aldi_results = await self.aldi_crawler.search_products(
                     query=search_request.query,
@@ -89,11 +108,44 @@ class SearchService:
                 results.extend(aldi_results)
                 logger.info(f"Aldi-Crawler lieferte {len(aldi_results)} Ergebnisse")
             
-            # Falls keine Ergebnisse oder Crawler nicht verfügbar: Fallback zu Mock-Daten
+            # Prüfe Store-Filter für Lidl
+            should_search_lidl = (
+                not search_request.selected_stores or 
+                'lidl' in [store.lower() for store in search_request.selected_stores]
+            )
+            
+            # Verwende Lidl-Crawler falls verfügbar und gewünscht
+            lidl_results = []
+            if should_search_lidl:
+                if self.lidl_crawler:
+                    logger.info(f"Crawle Lidl-Produkte für Query: {search_request.query}")
+                    try:
+                        async with self.lidl_crawler:
+                            lidl_results = await self.lidl_crawler.search_products(
+                                query=search_request.query,
+                                max_results=15  # Maximal 15 Produkte von Lidl
+                            )
+                        logger.info(f"Lidl-Crawler lieferte {len(lidl_results)} Ergebnisse")
+                    except Exception as e:
+                        logger.warning(f"Lidl-Crawler fehlgeschlagen: {e}")
+                        lidl_results = []
+                
+                            # Echte Crawling-Ergebnisse verwenden - KEINE Mock-Fallbacks!
+            if lidl_results:
+                results.extend(lidl_results)
+                logger.info(f"Lidl-Crawler lieferte {len(lidl_results)} echte Ergebnisse")
+            else:
+                logger.info(f"Lidl-Crawler fand keine Ergebnisse für '{search_request.query}' - das ist OK")
+            
+            # Zusätzliche Filter anwenden (Unit, Max Price)
+            if search_request.unit:
+                results = [r for r in results if r.unit and r.unit.lower() == search_request.unit.lower()]
+            if search_request.max_price:
+                results = [r for r in results if r.price <= search_request.max_price]
+            
+            # Echte Crawler-Ergebnisse - leere Liste ist OK wenn nichts gefunden
             if not results:
-                logger.info("Fallback zu Mock-Daten")
-                mock_results = await self._search_with_mock_data(search_request)
-                results.extend(mock_results)
+                logger.info(f"Keine echten Ergebnisse für '{search_request.query}' gefunden - das ist in Ordnung")
             
             return results
             

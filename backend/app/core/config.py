@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     aldi_crawler_enabled: bool = True  # Aldi-Crawler aktivieren
     aldi_base_url: str = "https://www.aldi-sued.de"
     
+    # Lidl-spezifische Einstellungen
+    lidl_crawler_enabled: bool = True  # Lidl-Crawler aktivieren
+    lidl_base_url: str = "https://www.lidl.de"
+    lidl_billiger_montag_url: str = "https://www.lidl.de/c/billiger-montag/a10006065?channel=store&tabCode=Current_Sales_Week"
+    
+    # OpenAI-Konfiguration für intelligente Dateninterpretation
+    openai_api_key: Optional[str] = None  # OpenAI API Key für LLM-basierte Extraktion
+    
     # Server-Konfiguration
     host: str = "127.0.0.1"
     port: int = 8000

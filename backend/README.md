@@ -61,6 +61,36 @@ Tests ausführen:
 pytest
 ```
 
+## Python-Skripte starten (Apple Silicon M1/M2 Macs)
+
+⚠️ **WICHTIG**: Auf Apple Silicon Macs müssen Python-Skripte mit ARM-Architektur gestartet werden:
+
+### Direkt mit arch-Kommando:
+```bash
+arch -arm64 python3 script_name.py
+```
+
+### Mit dem Hilfsskript:
+```bash
+./run_script.sh script_name.py
+```
+
+### Beispiele:
+```bash
+# Test-Skripte ausführen
+arch -arm64 python3 test_aldi_crawler.py
+arch -arm64 python3 test_lidl_crawler.py
+
+# Oder mit Hilfsskript
+./run_script.sh test_aldi_crawler.py
+./run_script.sh test_lidl_crawler.py
+
+# Server starten
+arch -arm64 python3 start.py
+```
+
+**Warum?** Die installierten Python-Pakete (pydantic, etc.) sind für ARM64 kompiliert, aber das Standard-Python verwendet x86_64, was zu Import-Fehlern führt.
+
 ## Projektstruktur
 
 ```
