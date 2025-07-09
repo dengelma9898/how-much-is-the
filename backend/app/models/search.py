@@ -13,7 +13,7 @@ class SearchRequest(BaseModel):
 class ProductResult(BaseModel):
     """Modell für ein Suchergebnis"""
     name: str = Field(..., description="Produktname")
-    price: Decimal = Field(..., gt=0, description="Preis in Euro")
+    price: Decimal = Field(..., ge=0, description="Preis in Euro (0 für Kategorie-Angebote ohne spezifischen Preis)")
     store: str = Field(..., description="Name des Supermarkts")
     store_logo_url: Optional[str] = Field(None, description="URL zum Store-Logo")
     product_url: Optional[str] = Field(None, description="URL zum Produkt")
@@ -27,6 +27,12 @@ class ProductResult(BaseModel):
     origin: Optional[str] = Field(None, description="Herkunft des Produkts")
     discount: Optional[str] = Field(None, description="Rabatt-Information (z.B. '-20%')")
     quality_info: Optional[str] = Field(None, description="Qualitätsinformationen (z.B. 'Bio', 'Klasse I')")
+    partner_program: bool = Field(default=False, description="Ob der Preis über eine Partner-App verfügbar ist")
+    available_until: Optional[str] = Field(None, description="Bis wann das Angebot verfügbar ist (z.B. 'Nur Montag')")
+    
+    # LIDL-spezifische Felder
+    reward_program_hint: Optional[str] = Field(None, description="Hinweis auf Treueprogramm (z.B. 'Lidl Plus')")
+    description: Optional[str] = Field(None, description="Zusätzliche Produktbeschreibung")
 
 class SearchResponse(BaseModel):
     """Response-Modell für Produktsuche"""

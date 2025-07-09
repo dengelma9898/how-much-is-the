@@ -1,41 +1,35 @@
+"""
+Preisvergleich Search Service - Playwright Ultimate Crawler als Standard
+Saubere Implementierung ohne Legacy-Fallbacks
+"""
+
 import time
 import logging
 from typing import List
 from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
 from app.services.mock_data import mock_data_service
 from app.services.aldi_crawler import create_aldi_crawler
+from app.services.lidl_crawler_ultimate import LidlUltimateCrawler
+from app.services.lidl_mock_data import LidlMockData
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class SearchService:
-    """Service für Produktsuche mit Firecrawl-Integration"""
+    """Search Service mit Ultimate Crawlern als Standard"""
     
     def __init__(self):
-        self.firecrawl_enabled = settings.firecrawl_enabled
-        
-        # Initialisiere Aldi-Crawler falls verfügbar
+        # Nur die besten Crawler initialisieren
         self.aldi_crawler = create_aldi_crawler()
-        
-        # Legacy Firecrawl-Initialisierung für Fallback
-        if self.firecrawl_enabled and settings.firecrawl_api_key:
-            try:
-                from firecrawl import FirecrawlApp
-                self.firecrawl = FirecrawlApp(api_key=settings.firecrawl_api_key)
-            except ImportError:
-                logger.warning("Warning: firecrawl-py nicht installiert. Verwende Mock-Daten.")
-                self.firecrawl_enabled = False
-        else:
-            self.firecrawl_enabled = False
+        self.lidl_crawler_ultimate = LidlUltimateCrawler()  # Ultimate Playwright Crawler
+        logger.info("🚀 SearchService initialisiert mit Playwright Ultimate Crawler")
     
     async def search_products(self, search_request: SearchRequest) -> SearchResponse:
         """Hauptmethode für Produktsuche"""
         start_time = time.time()
         
-        if self.firecrawl_enabled:
-            results = await self._search_with_firecrawl(search_request)
-        else:
-            results = await self._search_with_mock_data(search_request)
+        # Verwende IMMER echte Crawler (keine Mock-Daten außer als absoluter Fallback)
+        results = await self._search_with_real_crawlers(search_request)
         
         search_time_ms = int((time.time() - start_time) * 1000)
         
@@ -52,61 +46,99 @@ class SearchService:
         stores = mock_data_service.get_stores()
         return StoresResponse(stores=stores)
     
-    async def _search_with_mock_data(self, search_request: SearchRequest) -> List[ProductResult]:
-        """Suche mit Mock-Daten inkl. Filter"""
-        # Simuliere API-Delay
-        await self._simulate_delay()
+    async def _search_with_real_crawlers(self, search_request: SearchRequest) -> List[ProductResult]:
+        """Suche mit echten Crawlern - Ultimate Versions Only"""
+        try:
+            results = []
+            
+            # Prüfe Store-Filter für Aldi
+            should_search_aldi = (
+                not search_request.selected_stores or 
+                any(store.lower() in ['aldi', 'aldi süd', 'aldi-süd'] for store in search_request.selected_stores)
+            )
+            
+            # Verwende Aldi-Crawler falls verfügbar und gewünscht
+            if self.aldi_crawler and should_search_aldi:
+                logger.info(f"🛒 Crawle Aldi-Produkte für Query: {search_request.query}")
+                try:
+                    aldi_results = await self.aldi_crawler.search_products(
+                        query=search_request.query,
+                        max_results=50  # Mehr Aldi-Produkte
+                    )
+                    results.extend(aldi_results)
+                    logger.info(f"✅ Aldi-Crawler: {len(aldi_results)} Ergebnisse")
+                except Exception as e:
+                    logger.warning(f"⚠️  Aldi-Crawler Fehler: {e}")
+            
+            # Prüfe Store-Filter für Lidl
+            should_search_lidl = (
+                not search_request.selected_stores or 
+                'lidl' in [store.lower() for store in search_request.selected_stores]
+            )
+            
+            # Verwende Ultimate LIDL-Crawler (Playwright-basiert)
+            if should_search_lidl and self.lidl_crawler_ultimate:
+                logger.info(f"🛒 Crawle LIDL-Produkte mit Ultimate Playwright Crawler für Query: {search_request.query}")
+                try:
+                    lidl_results = await self.lidl_crawler_ultimate.search_products(
+                        query=search_request.query,
+                        max_results=120  # Alle verfügbaren Produkte
+                    )
+                    results.extend(lidl_results)
+                    logger.info(f"✅ LIDL-Ultimate-Crawler: {len(lidl_results)} Ergebnisse")
+                except Exception as e:
+                    logger.error(f"❌ LIDL-Ultimate-Crawler Fehler: {e}")
+                    # Kein Fallback - bei Fehlern soll deutlich werden was nicht funktioniert
+            
+            # Filter anwenden
+            if search_request.unit:
+                original_count = len(results)
+                results = [r for r in results if r.unit and r.unit.lower() == search_request.unit.lower()]
+                logger.info(f"🔍 Unit-Filter '{search_request.unit}': {original_count} → {len(results)} Produkte")
+                
+            if search_request.max_price:
+                original_count = len(results)
+                results = [r for r in results if r.price <= search_request.max_price]
+                logger.info(f"💰 Price-Filter '≤€{search_request.max_price}': {original_count} → {len(results)} Produkte")
+            
+            logger.info(f"🎯 FINALE Ergebnisse: {len(results)} Produkte")
+            return results
+            
+        except Exception as e:
+            logger.error(f"❌ Schwerwiegender Fehler bei Real Crawlers: {e}")
+            # Als absoluter Fallback: Mock-Daten mit Filter
+            return await self._emergency_fallback(search_request)
+    
+    async def _emergency_fallback(self, search_request: SearchRequest) -> List[ProductResult]:
+        """Notfall-Fallback zu Mock-Daten (nur bei schwerwiegenden Fehlern)"""
+        logger.warning("🚨 NOTFALL-FALLBACK zu Mock-Daten!")
         
+        # Simuliere API-Delay
+        import asyncio
+        await asyncio.sleep(0.5)
+        
+        # Verwende Mock-Daten
         results = mock_data_service.search_products(
             query=search_request.query,
             postal_code=search_request.postal_code
         )
 
-        # Filter: selected_stores
+        # Ergänze Lidl Mock-Daten
+        lidl_results = LidlMockData.get_products_for_query(
+            query=search_request.query,
+            max_results=10
+        )
+        results.extend(lidl_results)
+
+        # Filter anwenden
         if search_request.selected_stores:
             results = [r for r in results if r.store.lower() in [s.lower() for s in search_request.selected_stores]]
-        # Filter: unit
         if search_request.unit:
             results = [r for r in results if r.unit and r.unit.lower() == search_request.unit.lower()]
-        # Filter: max_price
         if search_request.max_price:
             results = [r for r in results if r.price <= search_request.max_price]
 
         return results
-    
-    async def _search_with_firecrawl(self, search_request: SearchRequest) -> List[ProductResult]:
-        """Suche mit Firecrawl - echte Implementierung mit Aldi-Crawler"""
-        try:
-            results = []
-            
-            # Verwende Aldi-Crawler falls verfügbar
-            if self.aldi_crawler:
-                logger.info(f"Crawle Aldi-Produkte für Query: {search_request.query}")
-                aldi_results = await self.aldi_crawler.search_products(
-                    query=search_request.query,
-                    max_results=15  # Maximal 15 Produkte von Aldi
-                )
-                results.extend(aldi_results)
-                logger.info(f"Aldi-Crawler lieferte {len(aldi_results)} Ergebnisse")
-            
-            # Falls keine Ergebnisse oder Crawler nicht verfügbar: Fallback zu Mock-Daten
-            if not results:
-                logger.info("Fallback zu Mock-Daten")
-                mock_results = await self._search_with_mock_data(search_request)
-                results.extend(mock_results)
-            
-            return results
-            
-        except Exception as e:
-            logger.error(f"Fehler beim Firecrawl-Search: {e}")
-            # Fallback zu Mock-Daten bei Fehlern
-            return await self._search_with_mock_data(search_request)
-    
-    async def _simulate_delay(self):
-        """Simuliert API-Delay für realistische Erfahrung"""
-        import asyncio
-        import random
-        delay = random.uniform(0.2, 0.8)  # 200-800ms Delay
-        await asyncio.sleep(delay)
 
+# Service-Instanz erstellen
 search_service = SearchService() 

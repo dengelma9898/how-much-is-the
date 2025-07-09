@@ -173,6 +173,8 @@ class AldiCrawler:
                         discount=None,  # Vereinfacht für bessere Performance
                         
                         # Aldi-spezifische Felder
+                        partner_program=False,  # Normale Aldi-Produkte benötigen keine Partner-App
+                        available_until=None,  # Reguläre Produkte haben keine begrenzte Verfügbarkeit
                         origin=None,
                         quality_info=None
                     )

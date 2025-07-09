@@ -28,7 +28,7 @@ def get_env_file() -> str:
     return f".env.{app_env}"
 
 class Settings(BaseSettings):
-    """Anwendungseinstellungen"""
+    """Anwendungseinstellungen - Playwright Ultimate Crawler Standard"""
     
     # Environment Info
     app_env: str = os.getenv("APP_ENV", "local")
@@ -37,17 +37,17 @@ class Settings(BaseSettings):
     api_v1_str: str = "/api/v1"
     project_name: str = "Preisvergleich API"
     
-    # Firecrawl-Konfiguration
-    firecrawl_api_key: Optional[str] = None
-    firecrawl_enabled: bool = False
-    
-    # Erweiterte Firecrawl-Einstellungen
-    firecrawl_max_age: int = 3600000  # 1 Stunde Cache in Millisekunden
-    firecrawl_max_results_per_store: int = 15  # Max Ergebnisse pro Supermarkt
-    
     # Aldi-spezifische Einstellungen
     aldi_crawler_enabled: bool = True  # Aldi-Crawler aktivieren
     aldi_base_url: str = "https://www.aldi-sued.de"
+    
+    # LIDL-spezifische Einstellungen (Ultimate Playwright Crawler)
+    lidl_crawler_enabled: bool = True  # LIDL-Ultimate-Crawler aktivieren
+    lidl_base_url: str = "https://www.lidl.de"
+    lidl_billiger_montag_url: str = "https://www.lidl.de/c/billiger-montag/a10006065?channel=store&tabCode=Current_Sales_Week"
+    lidl_max_results: int = 120  # Max Ergebnisse von LIDL Ultimate Crawler
+    lidl_timeout: int = 30  # Timeout in Sekunden für LIDL-Requests (mehr Zeit für Playwright)
+    lidl_cache_ttl: int = 1800  # Cache-Zeit in Sekunden (30 Minuten)
     
     # Server-Konfiguration
     host: str = "127.0.0.1"
