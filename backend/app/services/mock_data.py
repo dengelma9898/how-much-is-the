@@ -8,27 +8,10 @@ class MockDataService:
     
     def __init__(self):
         self.stores = [
-            Store(id="rewe", name="REWE", category="Supermarkt", 
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7b/Rewe_logo.svg/200px-Rewe_logo.svg.png",
-                  website_url="https://www.rewe.de"),
-            Store(id="edeka", name="EDEKA", category="Supermarkt",
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/EDEKA_logo.svg/200px-EDEKA_logo.svg.png", 
-                  website_url="https://www.edeka.de"),
             Store(id="lidl", name="Lidl", category="Discounter",
                   logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Lidl-Logo.svg/200px-Lidl-Logo.svg.png",
                   website_url="https://www.lidl.de"),
-            Store(id="aldi", name="ALDI", category="Discounter",
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/ALDI_S%C3%9CD_logo.svg/200px-ALDI_S%C3%9CD_logo.svg.png",
-                  website_url="https://www.aldi.de"),
-            Store(id="kaufland", name="Kaufland", category="Supermarkt",
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Kaufland_logo.svg/200px-Kaufland_logo.svg.png",
-                  website_url="https://www.kaufland.de"),
-            Store(id="dm", name="dm", category="Drogerie",
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Dm_Logo.svg/200px-Dm_Logo.svg.png",
-                  website_url="https://www.dm.de"),
-            Store(id="rossmann", name="Rossmann", category="Drogerie",
-                  logo_url="https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Rossmann_Logo.svg/200px-Rossmann_Logo.svg.png",
-                  website_url="https://www.rossmann.de"),
+            # Additional stores can be added later when their crawlers are implemented
         ]
         
         # Mock-Produktdaten mit verschiedenen Kategorien

@@ -28,44 +28,35 @@ def get_env_file() -> str:
     return f".env.{app_env}"
 
 class Settings(BaseSettings):
-    """Anwendungseinstellungen - Playwright Ultimate Crawler Standard"""
+    # API Settings
+    api_title: str = "Preisvergleich API"
+    api_version: str = "1.0.0"
+    debug: bool = False
     
-    # Environment Info
-    app_env: str = os.getenv("APP_ENV", "local")
+    # CORS Settings
+    backend_cors_origins: list = ["http://localhost:3000", "http://localhost:8000"]
     
-    # API-Konfiguration
-    api_v1_str: str = "/api/v1"
-    project_name: str = "Preisvergleich API"
+    # Database Settings
+    database_url: str = "postgresql+asyncpg://preisvergleich:password@localhost:5432/preisvergleich"
+    database_echo: bool = False
     
-    # Aldi-spezifische Einstellungen
-    aldi_crawler_enabled: bool = True  # Aldi-Crawler aktivieren
-    aldi_base_url: str = "https://www.aldi-sued.de"
+    # Crawler Settings
+    enable_crawling: bool = True
+    crawl_timeout: int = 30
+    crawl_delay: float = 1.0
     
-    # LIDL-spezifische Einstellungen (Ultimate Playwright Crawler)
-    lidl_crawler_enabled: bool = True  # LIDL-Ultimate-Crawler aktivieren
-    lidl_base_url: str = "https://www.lidl.de"
-    lidl_billiger_montag_url: str = "https://www.lidl.de/c/billiger-montag/a10006065?channel=store&tabCode=Current_Sales_Week"
-    lidl_max_results: int = 120  # Max Ergebnisse von LIDL Ultimate Crawler
-    lidl_timeout: int = 30  # Timeout in Sekunden für LIDL-Requests (mehr Zeit für Playwright)
-    lidl_cache_ttl: int = 1800  # Cache-Zeit in Sekunden (30 Minuten)
+    # Scheduler Settings
+    enable_scheduler: bool = True
+    weekly_crawl_hour: int = 2  # 2 AM
+    weekly_crawl_day_of_week: str = "sunday"
+    max_concurrent_crawls: int = 2
     
-    # Server-Konfiguration
-    host: str = "127.0.0.1"
-    port: int = 8000
-    debug: bool = True
-    
-    # Logging
-    log_level: str = "INFO"
+    # Cache Settings
+    cache_ttl_hours: int = 24
     
     class Config:
-        env_file = get_env_file()
+        env_file = ".env"
         case_sensitive = False
-        
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Log welche .env-Datei geladen wurde
-        print(f"🔧 Loaded configuration from: {self.Config.env_file}")
-        if not os.path.exists(self.Config.env_file):
-            print(f"⚠️  Warning: {self.Config.env_file} not found, using defaults")
 
+# Global settings instance
 settings = Settings() 

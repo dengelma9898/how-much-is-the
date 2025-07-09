@@ -8,7 +8,6 @@ import logging
 from typing import List
 from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
 from app.services.mock_data import mock_data_service
-from app.services.aldi_crawler import create_aldi_crawler
 from app.services.lidl_crawler_ultimate import LidlUltimateCrawler
 from app.services.lidl_mock_data import LidlMockData
 from app.core.config import settings
@@ -19,10 +18,9 @@ class SearchService:
     """Search Service mit Ultimate Crawlern als Standard"""
     
     def __init__(self):
-        # Nur die besten Crawler initialisieren
-        self.aldi_crawler = create_aldi_crawler()
+        # Nur Lidl Crawler für jetzt
         self.lidl_crawler_ultimate = LidlUltimateCrawler()  # Ultimate Playwright Crawler
-        logger.info("🚀 SearchService initialisiert mit Playwright Ultimate Crawler")
+        logger.info("🚀 SearchService initialisiert mit Lidl Ultimate Crawler")
     
     async def search_products(self, search_request: SearchRequest) -> SearchResponse:
         """Hauptmethode für Produktsuche"""
@@ -51,26 +49,7 @@ class SearchService:
         try:
             results = []
             
-            # Prüfe Store-Filter für Aldi
-            should_search_aldi = (
-                not search_request.selected_stores or 
-                any(store.lower() in ['aldi', 'aldi süd', 'aldi-süd'] for store in search_request.selected_stores)
-            )
-            
-            # Verwende Aldi-Crawler falls verfügbar und gewünscht
-            if self.aldi_crawler and should_search_aldi:
-                logger.info(f"🛒 Crawle Aldi-Produkte für Query: {search_request.query}")
-                try:
-                    aldi_results = await self.aldi_crawler.search_products(
-                        query=search_request.query,
-                        max_results=50  # Mehr Aldi-Produkte
-                    )
-                    results.extend(aldi_results)
-                    logger.info(f"✅ Aldi-Crawler: {len(aldi_results)} Ergebnisse")
-                except Exception as e:
-                    logger.warning(f"⚠️  Aldi-Crawler Fehler: {e}")
-            
-            # Prüfe Store-Filter für Lidl
+            # Prüfe Store-Filter für Lidl (only store we support now)
             should_search_lidl = (
                 not search_request.selected_stores or 
                 'lidl' in [store.lower() for store in search_request.selected_stores]
