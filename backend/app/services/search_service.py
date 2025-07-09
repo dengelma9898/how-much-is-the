@@ -1,20 +1,29 @@
 import time
+import logging
 from typing import List
 from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
 from app.services.mock_data import mock_data_service
+from app.services.aldi_crawler import create_aldi_crawler
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class SearchService:
     """Service für Produktsuche mit Firecrawl-Integration"""
     
     def __init__(self):
         self.firecrawl_enabled = settings.firecrawl_enabled
+        
+        # Initialisiere Aldi-Crawler falls verfügbar
+        self.aldi_crawler = create_aldi_crawler()
+        
+        # Legacy Firecrawl-Initialisierung für Fallback
         if self.firecrawl_enabled and settings.firecrawl_api_key:
             try:
                 from firecrawl import FirecrawlApp
                 self.firecrawl = FirecrawlApp(api_key=settings.firecrawl_api_key)
             except ImportError:
-                print("Warning: firecrawl-py nicht installiert. Verwende Mock-Daten.")
+                logger.warning("Warning: firecrawl-py nicht installiert. Verwende Mock-Daten.")
                 self.firecrawl_enabled = False
         else:
             self.firecrawl_enabled = False
@@ -66,17 +75,32 @@ class SearchService:
         return results
     
     async def _search_with_firecrawl(self, search_request: SearchRequest) -> List[ProductResult]:
-        """Suche mit Firecrawl (für zukünftige Implementierung)"""
-        # TODO: Implementiere echte Firecrawl-Integration
-        # Für jetzt fallback zu Mock-Daten
-        return await self._search_with_mock_data(search_request)
-        
-        # Zukünftige Firecrawl-Implementierung:
-        # 1. Definiere Target-URLs für verschiedene Supermärkte
-        # 2. Crawle Produktseiten mit Suchbegriff
-        # 3. Extrahiere Produktdaten (Name, Preis, etc.)
-        # 4. Normalisiere und strukturiere Daten
-        # 5. Gebe ProductResult-Liste zurück
+        """Suche mit Firecrawl - echte Implementierung mit Aldi-Crawler"""
+        try:
+            results = []
+            
+            # Verwende Aldi-Crawler falls verfügbar
+            if self.aldi_crawler:
+                logger.info(f"Crawle Aldi-Produkte für Query: {search_request.query}")
+                aldi_results = await self.aldi_crawler.search_products(
+                    query=search_request.query,
+                    max_results=15  # Maximal 15 Produkte von Aldi
+                )
+                results.extend(aldi_results)
+                logger.info(f"Aldi-Crawler lieferte {len(aldi_results)} Ergebnisse")
+            
+            # Falls keine Ergebnisse oder Crawler nicht verfügbar: Fallback zu Mock-Daten
+            if not results:
+                logger.info("Fallback zu Mock-Daten")
+                mock_results = await self._search_with_mock_data(search_request)
+                results.extend(mock_results)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Fehler beim Firecrawl-Search: {e}")
+            # Fallback zu Mock-Daten bei Fehlern
+            return await self._search_with_mock_data(search_request)
     
     async def _simulate_delay(self):
         """Simuliert API-Delay für realistische Erfahrung"""

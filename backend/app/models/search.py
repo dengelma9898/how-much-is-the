@@ -20,6 +20,13 @@ class ProductResult(BaseModel):
     image_url: Optional[str] = Field(None, description="URL zum Produktbild")
     availability: str = Field(default="verfügbar", description="Verfügbarkeitsstatus")
     price_per_unit: Optional[Decimal] = Field(None, description="Preis pro Einheit")
+    # Zusätzliche Felder für erweiterte Produktinformationen
+    unit: Optional[str] = Field(None, description="Einheit/Verpackung (z.B. '1L', '500g', 'Stück')")
+    category: Optional[str] = Field(None, description="Produktkategorie")
+    brand: Optional[str] = Field(None, description="Marke oder Eigenmarke")
+    origin: Optional[str] = Field(None, description="Herkunft des Produkts")
+    discount: Optional[str] = Field(None, description="Rabatt-Information (z.B. '-20%')")
+    quality_info: Optional[str] = Field(None, description="Qualitätsinformationen (z.B. 'Bio', 'Klasse I')")
 
 class SearchResponse(BaseModel):
     """Response-Modell für Produktsuche"""
