@@ -72,12 +72,12 @@ class Settings(BaseSettings):
     # Store-specific Settings
     lidl_crawler_enabled: bool = True
     lidl_base_url: str = "https://www.lidl.de"
-    lidl_max_products_per_crawl: int = 20  # Reduced from 120 for faster crawls
+    lidl_max_products_per_crawl: int = 1000  # Erhöht für vollständige Extraktion aller verfügbaren Produkte
     lidl_timeout_seconds: int = 60
 
     aldi_crawler_enabled: bool = True
     aldi_base_url: str = "https://www.aldi-sued.de"
-    aldi_max_products_per_crawl: int = 20  # Reduced from 100 for faster crawls
+    aldi_max_products_per_crawl: int = 1000  # Erhöht für vollständige Extraktion
 
     # Firecrawl Settings (for Aldi)
     firecrawl_enabled: bool = False

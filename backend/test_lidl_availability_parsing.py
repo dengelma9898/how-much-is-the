@@ -126,15 +126,14 @@ def test_product_result_creation():
     print("=== Test ProductResult-Erstellung ===\n")
     
     from app.models.search import ProductResult
-    from decimal import Decimal
     
     try:
         # Test mit allen neuen Feldern
         product = ProductResult(
             name="Test Milch",
-            price=Decimal("1.59"),
+            price="1.59",  # Convert to string
             store="LIDL",
-            availability=True,
+            availability="verfügbar",  # Convert to string
             availability_text="nur in der Filiale 07.07. - 12.07.",
             offer_valid_until="2024-07-12",
             description="1L Vollmilch",

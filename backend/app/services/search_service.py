@@ -1,33 +1,30 @@
 """
-Preisvergleich Search Service - Playwright Ultimate Crawler als Standard
-Saubere Implementierung ohne Legacy-Fallbacks
+Preisvergleich Search Service - Nur Datenbanksuche, kein Crawling!
+Der SearchService liest ausschließlich aus der Datenbank und crawlt niemals.
 """
 
 import time
 import logging
 from typing import List
 from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
+from app.services.database_service import DatabaseService
+from app.core.database import get_async_session
 from app.services.mock_data import mock_data_service
-from app.services.lidl_crawler_ultimate import LidlUltimateCrawler
-from app.services.lidl_mock_data import LidlMockData
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 class SearchService:
-    """Search Service mit Ultimate Crawlern als Standard"""
+    """Search Service - Nur Datenbanksuche, kein Crawling!"""
     
     def __init__(self):
-        # Nur Lidl Crawler für jetzt
-        self.lidl_crawler_ultimate = LidlUltimateCrawler()  # Ultimate Playwright Crawler
-        logger.info("🚀 SearchService initialisiert mit Lidl Ultimate Crawler")
+        logger.info("🔍 SearchService initialisiert - NUR DATENBANKSUCHE, KEIN CRAWLING!")
     
     async def search_products(self, search_request: SearchRequest) -> SearchResponse:
-        """Hauptmethode für Produktsuche"""
+        """Hauptmethode für Produktsuche - NUR aus Datenbank"""
         start_time = time.time()
         
-        # Verwende IMMER echte Crawler (keine Mock-Daten außer als absoluter Fallback)
-        results = await self._search_with_real_crawlers(search_request)
+        # Suche nur in der Datenbank
+        results = await self._search_in_database(search_request)
         
         search_time_ms = int((time.time() - start_time) * 1000)
         
@@ -35,8 +32,10 @@ class SearchService:
             results=results,
             query=search_request.query,
             postal_code=search_request.postal_code,
-            total_results=len(results),
-            search_time_ms=search_time_ms
+            total_results=len(results),  # Legacy field
+            total_products=len(results),  # New field
+            search_time_ms=search_time_ms,
+            source="database"
         )
     
     async def get_stores(self) -> StoresResponse:
@@ -44,57 +43,36 @@ class SearchService:
         stores = mock_data_service.get_stores()
         return StoresResponse(stores=stores)
     
-    async def _search_with_real_crawlers(self, search_request: SearchRequest) -> List[ProductResult]:
-        """Suche mit echten Crawlern - Ultimate Versions Only"""
+    async def _search_in_database(self, search_request: SearchRequest) -> List[ProductResult]:
+        """Suche in der Datenbank - KEIN CRAWLING"""
         try:
-            results = []
+            # Verwende den korrekten async session maker
+            from app.core.database import async_session_maker
             
-            # Prüfe Store-Filter für Lidl (only store we support now)
-            should_search_lidl = (
-                not search_request.selected_stores or 
-                'lidl' in [store.lower() for store in search_request.selected_stores]
-            )
-            
-            # Verwende Ultimate LIDL-Crawler (Playwright-basiert)
-            if should_search_lidl and self.lidl_crawler_ultimate:
-                logger.info(f"🛒 Crawle LIDL-Produkte mit Ultimate Playwright Crawler für Query: {search_request.query}")
-                try:
-                    lidl_results = await self.lidl_crawler_ultimate.search_products(
-                        query=search_request.query,
-                        max_results=120  # Alle verfügbaren Produkte
-                    )
-                    results.extend(lidl_results)
-                    logger.info(f"✅ LIDL-Ultimate-Crawler: {len(lidl_results)} Ergebnisse")
-                except Exception as e:
-                    logger.error(f"❌ LIDL-Ultimate-Crawler Fehler: {e}")
-                    # Kein Fallback - bei Fehlern soll deutlich werden was nicht funktioniert
-            
-            # Filter anwenden
-            if search_request.unit:
-                original_count = len(results)
-                results = [r for r in results if r.unit and r.unit.lower() == search_request.unit.lower()]
-                logger.info(f"🔍 Unit-Filter '{search_request.unit}': {original_count} → {len(results)} Produkte")
+            async with async_session_maker() as session:
+                db_service = DatabaseService(session)
                 
-            if search_request.max_price:
-                original_count = len(results)
-                results = [r for r in results if r.price <= search_request.max_price]
-                logger.info(f"💰 Price-Filter '≤€{search_request.max_price}': {original_count} → {len(results)} Produkte")
-            
-            logger.info(f"🎯 FINALE Ergebnisse: {len(results)} Produkte")
-            return results
-            
+                logger.info(f"🔍 Suche in Datenbank nach Query: '{search_request.query}'")
+                
+                # Suche in der Datenbank nach bereits gecrawlten Produkten
+                products = await db_service.search_products(
+                    query=search_request.query,
+                    postal_code=search_request.postal_code,
+                    stores=search_request.stores,  # Liste von Store-Namen
+                    limit=1000  # Alle verfügbaren Ergebnisse
+                )
+                
+                logger.info(f"✅ {len(products)} Produkte aus Datenbank gefunden")
+                return products
+                
         except Exception as e:
-            logger.error(f"❌ Schwerwiegender Fehler bei Real Crawlers: {e}")
-            # Als absoluter Fallback: Mock-Daten mit Filter
+            logger.error(f"❌ Datenbankfehler: {e}")
+            # Fallback zu Mock-Daten nur bei Datenbankfehlern
             return await self._emergency_fallback(search_request)
     
     async def _emergency_fallback(self, search_request: SearchRequest) -> List[ProductResult]:
-        """Notfall-Fallback zu Mock-Daten (nur bei schwerwiegenden Fehlern)"""
-        logger.warning("🚨 NOTFALL-FALLBACK zu Mock-Daten!")
-        
-        # Simuliere API-Delay
-        import asyncio
-        await asyncio.sleep(0.5)
+        """Notfall-Fallback zu Mock-Daten bei Datenbankfehlern"""
+        logger.warning("🚨 NOTFALL-FALLBACK zu Mock-Daten wegen Datenbankfehler!")
         
         # Verwende Mock-Daten
         results = mock_data_service.search_products(
@@ -102,20 +80,9 @@ class SearchService:
             postal_code=search_request.postal_code
         )
 
-        # Ergänze Lidl Mock-Daten
-        lidl_results = LidlMockData.get_products_for_query(
-            query=search_request.query,
-            max_results=10
-        )
-        results.extend(lidl_results)
-
         # Filter anwenden
-        if search_request.selected_stores:
-            results = [r for r in results if r.store.lower() in [s.lower() for s in search_request.selected_stores]]
-        if search_request.unit:
-            results = [r for r in results if r.unit and r.unit.lower() == search_request.unit.lower()]
-        if search_request.max_price:
-            results = [r for r in results if r.price <= search_request.max_price]
+        if search_request.stores:
+            results = [r for r in results if r.store.lower() in [s.lower() for s in search_request.stores]]
 
         return results
 

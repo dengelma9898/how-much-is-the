@@ -342,6 +342,14 @@ class CrawlerService:
         # Extract brand if not already set
         brand = product.brand or self._extract_brand(product)
         
+        # Convert availability from string to boolean for database
+        availability_bool = True  # Default
+        if product.availability is not None:
+            if isinstance(product.availability, str):
+                availability_bool = product.availability.lower() not in ["nicht verfügbar", "ausverkauft", "vergriffen", "nicht lieferbar"]
+            else:
+                availability_bool = bool(product.availability)
+
         return {
             "name": product.name[:255],  # Ensure max length
             "description": product.description[:1000] if product.description else None,
@@ -350,7 +358,7 @@ class CrawlerService:
             "store_id": store_id,
             "price": price,
             "unit": product.unit[:50] if product.unit else None,
-            "availability": product.availability if product.availability is not None else True,
+            "availability": availability_bool,
             "availability_text": product.availability_text[:255] if product.availability_text else None,
             "offer_valid_until": product.offer_valid_until,
             "image_url": product.image_url[:500] if product.image_url else None,

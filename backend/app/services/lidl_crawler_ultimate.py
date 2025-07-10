@@ -28,10 +28,25 @@ class LidlUltimateCrawler:
         
         # KORREKTE CSS-Selektoren für LIDL-Produkte
         self.product_selectors = [
-            '.odsc-tile__inner',  # Hauptselektor für Produktkarten
+            '.product-grid-box',  # Hauptselektor für Produktkarten (direkt kompatibel mit content-selektoren)
+            '.odsc-tile__inner',  # Alternative für neuere LIDL-Struktur
             '[class*="odsc-tile__inner"]',  # Fallback mit Teilstring-Match
-            '.product-grid-box',  # Fallback-Selektor
             '[data-testid*="product"]'  # Zusätzlicher Fallback
+        ]
+        
+        # Alternative Content-Selektoren für verschiedene Container-Typen
+        self.title_selectors = [
+            '.product-grid-box__title',  # Standard LIDL Produkttitel
+            '[data-testid*="title"]',    # Alternative für neue Struktur
+            'h2', 'h3', 'h4',           # Fallback Header-Selektoren
+            '.title', '.name'           # Generic Title-Selektoren
+        ]
+        
+        self.price_selectors = [
+            '.ods-price__value',         # Standard LIDL Preisselektor
+            '[class*="price"]',          # Fallback für jede Preis-Klasse
+            '[data-testid*="price"]',    # Data-testid Fallback
+            '.price', '.cost'            # Generic Preis-Selektoren
         ]
 
     async def crawl_all_products(self, max_results: int = 1000, postal_code: str = "10115") -> List[ProductResult]:
@@ -123,7 +138,7 @@ class LidlUltimateCrawler:
             logger.error(f"   ❌ Scroll-Strategie Fehler: {e}")
     
     async def _scroll_down_thoroughly(self, page: Page) -> None:
-        """Scröllt langsam und gründlich nach unten"""
+        """Scrollt langsam und gründlich nach unten"""
         try:
             scroll_step = 300  # Kleinere Schritte für besseres Lazy Loading
             max_scrolls = 50   # Mehr Scroll-Versuche
@@ -161,7 +176,7 @@ class LidlUltimateCrawler:
             logger.error(f"      ❌ Runter-Scroll Fehler: {e}")
     
     async def _scroll_up_thoroughly(self, page: Page) -> None:
-        """Scröllt langsam nach oben um versteckte Elemente zu aktivieren"""
+        """Scrollt langsam nach oben um versteckte Elemente zu aktivieren"""
         try:
             current_pos = await page.evaluate("window.pageYOffset")
             scroll_step = 400
@@ -352,22 +367,36 @@ class LidlUltimateCrawler:
     async def _extract_single_product(self, container, page: Page) -> Optional[ProductResult]:
         """Extrahiert ein einzelnes Produkt aus dem Container mit korrekten LIDL CSS-Selektoren"""
         try:
-            # Produktname - KORREKT: product-grid-box__title
-            title_elem = await container.query_selector('.product-grid-box__title')
-            if not title_elem:
-                return None
-            name = await title_elem.inner_text()
-            name = name.strip()
+            # Produktname - mit flexiblen Selektoren
+            title_elem = None
+            name = None
+            for title_selector in self.title_selectors:
+                title_elem = await container.query_selector(title_selector)
+                if title_elem:
+                    try:
+                        name = await title_elem.inner_text()
+                        name = name.strip()
+                        if name and len(name) >= 2:
+                            break
+                    except:
+                        continue
             
             if not name or len(name) < 2:
                 return None
             
-            # Preis - KORREKT: ods-price__value
-            price_elem = await container.query_selector('.ods-price__value')
-            if not price_elem:
-                return None
-            price_text = await price_elem.inner_text()
-            price = self._parse_price(price_text)
+            # Preis - mit flexiblen Selektoren
+            price_elem = None
+            price = None
+            for price_selector in self.price_selectors:
+                price_elem = await container.query_selector(price_selector)
+                if price_elem:
+                    try:
+                        price_text = await price_elem.inner_text()
+                        price = self._parse_price(price_text)
+                        if price is not None:
+                            break
+                    except:
+                        continue
             
             if price is None:
                 return None
@@ -430,11 +459,11 @@ class LidlUltimateCrawler:
             
             return ProductResult(
                 name=name,
-                price=price,
+                price=str(price),  # Convert Decimal to string
                 store="LIDL",
                 image_url=image_url,
                 product_url=self.base_url,
-                availability=availability,
+                availability="verfügbar" if availability else "nicht verfügbar",  # Convert bool to string
                 availability_text=parsed_availability_text,
                 offer_valid_until=offer_valid_until,
                 description=description,
