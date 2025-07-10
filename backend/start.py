@@ -215,6 +215,10 @@ def main():
     # Lade Environment-Konfiguration
     env_config = load_env_config(args.env)
     
+    # Wichtig: Setze alle Environment-Variablen aus der .env-Datei
+    for key, value in env_config.items():
+        os.environ[key] = value
+    
     # Zeige wichtige Konfiguration an
     print("⚙️  Konfiguration:")
     print(f"   - Host: {args.host or env_config.get('HOST', '127.0.0.1')}")

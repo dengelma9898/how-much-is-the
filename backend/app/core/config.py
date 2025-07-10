@@ -36,8 +36,12 @@ class Settings(BaseSettings):
     # CORS Settings
     backend_cors_origins: list = ["http://localhost:3000", "http://localhost:8000"]
     
-    # Database Settings
-    database_url: str = "postgresql+asyncpg://preisvergleich:password@localhost:5432/preisvergleich"
+    # Database Settings - Homebrew PostgreSQL auf Mac
+    database_url: str = os.getenv(
+        "DATABASE_URL", 
+        # Homebrew PostgreSQL: User = Mac username, no password
+        "postgresql+asyncpg://dengelma:@localhost:5432/preisvergleich_dev"
+    )
     database_echo: bool = False
     
     # Crawler Settings
@@ -67,12 +71,12 @@ class Settings(BaseSettings):
     # Store-specific Settings
     lidl_crawler_enabled: bool = True
     lidl_base_url: str = "https://www.lidl.de"
-    lidl_max_products_per_crawl: int = 120
+    lidl_max_products_per_crawl: int = 20  # Reduced from 120 for faster crawls
     lidl_timeout_seconds: int = 60
 
     aldi_crawler_enabled: bool = True
     aldi_base_url: str = "https://www.aldi-sued.de"
-    aldi_max_products_per_crawl: int = 100
+    aldi_max_products_per_crawl: int = 20  # Reduced from 100 for faster crawls
 
     # Firecrawl Settings (for Aldi)
     firecrawl_enabled: bool = False

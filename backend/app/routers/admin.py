@@ -7,7 +7,8 @@ from ..core.database import get_async_session
 from ..services.database_service import DatabaseService
 from ..services.scheduler_service import scheduler_service
 from ..services.crawler_service import CrawlerService
-from ..services.crawl_status_service import crawl_status_service, CrawlType
+from ..services.crawl_status_service import crawl_status_service, CrawlType, CrawlStatus
+from ..services.cleanup_service import cleanup_service
 
 logger = logging.getLogger(__name__)
 
@@ -210,15 +211,82 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
         # Update status to initializing
         crawl_status_service.update_crawl_progress(
             crawl_id, 
-            status=crawl_status_service.CrawlStatus.INITIALIZING,
+            status=CrawlStatus.INITIALIZING,
             current_step="Initializing crawl session"
         )
         
-        # Run the actual crawl
-        results = await scheduler_service.trigger_crawl_now(
-            store_name=store_name,
-            postal_code=postal_code
-        )
+        # Create a new database session for this background task
+        from ..core.database import async_session_maker
+        from ..services.database_service import DatabaseService
+        from ..services.crawler_service import CrawlerService
+        
+        async with async_session_maker() as session:
+            db_service = DatabaseService(session)
+            crawler_service = CrawlerService(db_service)
+            
+            if store_name:
+                # Crawl specific store
+                store = await db_service.stores.get_by_name(store_name)
+                if not store:
+                    raise ValueError(f"Store '{store_name}' not found")
+                
+                if not store.enabled:
+                    raise ValueError(f"Store '{store_name}' is disabled")
+                
+                stores = [store]
+            else:
+                # Crawl all enabled stores
+                stores = await db_service.stores.get_all_enabled()
+            
+            results = []
+            
+            for store in stores:
+                try:
+                    # Start crawl session
+                    crawl_session = await db_service.crawl_sessions.create(store.id)
+                    await db_service.commit()
+                    
+                    # Run crawler with enhanced tracking
+                    success_count, error_count = await crawler_service.crawl_store(
+                        store_name=store.name,
+                        postal_code=postal_code,
+                        crawl_session_id=crawl_session.id,
+                        crawl_id=crawl_id  # Pass the crawl_id for progress tracking
+                    )
+                    
+                    # Update session
+                    await db_service.crawl_sessions.complete(
+                        session_id=crawl_session.id,
+                        total_products=success_count + error_count,
+                        success_count=success_count,
+                        error_count=error_count,
+                        notes="Manual crawl triggered"
+                    )
+                    
+                    results.append({
+                        "store": store.name,
+                        "success": True,
+                        "products_crawled": success_count,
+                        "errors": error_count
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Error in enhanced crawl for {store.name}: {str(e)}")
+                    
+                    # Mark session as failed if it exists
+                    if 'crawl_session' in locals():
+                        await db_service.crawl_sessions.fail(
+                            crawl_session.id,
+                            f"Enhanced crawl error: {str(e)}"
+                        )
+                    
+                    results.append({
+                        "store": store.name,
+                        "success": False,
+                        "error": str(e)
+                    })
+                
+                await db_service.commit()
         
         # Process results and update tracking
         total_products = 0
@@ -234,7 +302,7 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
                 total_errors += 1
         
         # Complete the crawl tracking
-        final_status = crawl_status_service.CrawlStatus.COMPLETED if all_successful else crawl_status_service.CrawlStatus.FAILED
+        final_status = CrawlStatus.COMPLETED if all_successful else CrawlStatus.FAILED
         
         crawl_status_service.complete_crawl(
             crawl_id,
@@ -247,7 +315,7 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
         logger.error(f"Enhanced crawl {crawl_id} failed: {str(e)}")
         crawl_status_service.complete_crawl(
             crawl_id,
-            status=crawl_status_service.CrawlStatus.FAILED,
+            status=CrawlStatus.FAILED,
             error_details=str(e)
         )
 
@@ -421,4 +489,117 @@ async def get_recent_logs():
                 "message": "Weekly crawl job scheduled"
             }
         ]
-    } 
+    }
+
+
+@router.get("/cleanup/statistics")
+async def get_cleanup_statistics():
+    """Get statistics about products that need cleanup"""
+    try:
+        stats = await cleanup_service.get_cleanup_statistics()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting cleanup statistics: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting cleanup statistics: {str(e)}")
+
+
+@router.post("/cleanup/expired")
+async def cleanup_expired_offers(
+    background_tasks: BackgroundTasks,
+    dry_run: bool = Query(True, description="If true, only analyze without deleting"),
+    triggered_by: str = Query("admin", description="Who triggered this cleanup")
+):
+    """Cleanup expired offers based on offer_valid_until dates"""
+    try:
+        from datetime import datetime
+        
+        if dry_run:
+            # Immediate analysis for dry run
+            result = await cleanup_service.cleanup_expired_offers(dry_run=True)
+            return {
+                **result,
+                "triggered_by": triggered_by,
+                "note": "This was a dry run - no data was deleted"
+            }
+        else:
+            # Background cleanup for real deletion
+            cleanup_id = f"cleanup_expired_{int(datetime.utcnow().timestamp())}"
+            
+            background_tasks.add_task(
+                _run_expired_cleanup,
+                cleanup_id=cleanup_id,
+                triggered_by=triggered_by
+            )
+            
+            return {
+                "message": "Expired offers cleanup started in background",
+                "cleanup_id": cleanup_id,
+                "triggered_by": triggered_by,
+                "note": "Check logs for completion status"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in expired offers cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in cleanup: {str(e)}")
+
+
+@router.post("/cleanup/old-products")
+async def cleanup_old_products_endpoint(
+    background_tasks: BackgroundTasks,
+    days_old: int = Query(30, description="Delete products older than X days"),
+    dry_run: bool = Query(True, description="If true, only analyze without deleting"),
+    triggered_by: str = Query("admin", description="Who triggered this cleanup")
+):
+    """Cleanup old products without offer end dates"""
+    try:
+        from datetime import datetime
+        
+        if dry_run:
+            # Immediate analysis for dry run
+            result = await cleanup_service.cleanup_old_products(days_old=days_old, dry_run=True)
+            return {
+                **result,
+                "triggered_by": triggered_by,
+                "note": "This was a dry run - no data was deleted"
+            }
+        else:
+            # Background cleanup for real deletion
+            cleanup_id = f"cleanup_old_{int(datetime.utcnow().timestamp())}"
+            
+            background_tasks.add_task(
+                _run_old_products_cleanup,
+                cleanup_id=cleanup_id,
+                days_old=days_old,
+                triggered_by=triggered_by
+            )
+            
+            return {
+                "message": f"Old products cleanup started (older than {days_old} days)",
+                "cleanup_id": cleanup_id,
+                "triggered_by": triggered_by,
+                "note": "Check logs for completion status"
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in old products cleanup: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in cleanup: {str(e)}")
+
+
+async def _run_expired_cleanup(cleanup_id: str, triggered_by: str):
+    """Background task for expired offers cleanup"""
+    try:
+        logger.info(f"🧹 Starting expired offers cleanup {cleanup_id} (triggered by {triggered_by})")
+        result = await cleanup_service.cleanup_expired_offers(dry_run=False)
+        logger.info(f"✅ Expired offers cleanup {cleanup_id} completed: {result}")
+    except Exception as e:
+        logger.error(f"❌ Expired offers cleanup {cleanup_id} failed: {e}")
+
+
+async def _run_old_products_cleanup(cleanup_id: str, days_old: int, triggered_by: str):
+    """Background task for old products cleanup"""
+    try:
+        logger.info(f"🧹 Starting old products cleanup {cleanup_id} (triggered by {triggered_by})")
+        result = await cleanup_service.cleanup_old_products(days_old=days_old, dry_run=False)
+        logger.info(f"✅ Old products cleanup {cleanup_id} completed: {result}")
+    except Exception as e:
+        logger.error(f"❌ Old products cleanup {cleanup_id} failed: {e}") 

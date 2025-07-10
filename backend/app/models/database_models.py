@@ -73,6 +73,8 @@ class DatabaseProduct(Base):
     price: Mapped[Optional[Decimal]] = mapped_column(DECIMAL(10, 2))
     unit: Mapped[Optional[str]] = mapped_column(String(50))
     availability: Mapped[bool] = mapped_column(Boolean, default=True)
+    availability_text: Mapped[Optional[str]] = mapped_column(String(255))
+    offer_valid_until: Mapped[Optional[str]] = mapped_column(String(10))  # YYYY-MM-DD format
     image_url: Mapped[Optional[str]] = mapped_column(String(500))
     product_url: Mapped[Optional[str]] = mapped_column(String(500))
     postal_code: Mapped[Optional[str]] = mapped_column(String(10))
@@ -95,6 +97,7 @@ class DatabaseProduct(Base):
         Index('idx_products_category', 'category'),
         Index('idx_products_postal_code', 'postal_code'),
         Index('idx_products_availability', 'availability'),
+        Index('idx_products_offer_valid_until', 'offer_valid_until'),
         Index('idx_products_deleted_at', 'deleted_at'),
         Index('idx_products_created_at', 'created_at'),
     )
