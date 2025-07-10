@@ -36,11 +36,12 @@ class Settings(BaseSettings):
     # CORS Settings
     backend_cors_origins: list = ["http://localhost:3000", "http://localhost:8000"]
     
-    # Database Settings - Homebrew PostgreSQL auf Mac
+    # Database Settings
     database_url: str = os.getenv(
         "DATABASE_URL", 
-        # Homebrew PostgreSQL: User = Mac username, no password
-        "postgresql+asyncpg://dengelma:@localhost:5432/preisvergleich_dev"
+        # Default: Generic PostgreSQL URL for development
+        # For Homebrew PostgreSQL on Mac, use your username instead of 'preisvergleich_user'
+        f"postgresql+asyncpg://{os.getenv('USER', 'preisvergleich_user')}:@localhost:5432/preisvergleich_dev"
     )
     database_echo: bool = False
     
