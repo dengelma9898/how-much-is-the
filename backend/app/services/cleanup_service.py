@@ -33,32 +33,19 @@ class CleanupService:
         try:
             current_date = datetime.now().date().strftime('%Y-%m-%d')
             
-            try:
-                async with async_session_maker() as db:
-                    # Finde abgelaufene Angebote
-                    from sqlalchemy import select
-                    expired_query = select(DatabaseProduct).filter(
-                        and_(
-                            DatabaseProduct.offer_valid_until.is_not(None),
-                            DatabaseProduct.offer_valid_until < current_date,
-                            DatabaseProduct.deleted_at.is_(None)  # Noch nicht gelöscht
-                        )
+            async with async_session_maker() as db:
+                # Finde abgelaufene Angebote
+                from sqlalchemy import select
+                expired_query = select(DatabaseProduct).filter(
+                    and_(
+                        DatabaseProduct.offer_valid_until.is_not(None),
+                        DatabaseProduct.offer_valid_until < current_date,
+                        DatabaseProduct.deleted_at.is_(None)  # Noch nicht gelöscht
                     )
-                    
-                    result = await db.execute(expired_query)
-                    expired_products = result.scalars().all()
-            except Exception as db_error:
-                # Fallback für fehlende Datenbankverbindung
-                self.logger.warning(f"Datenbank nicht verfügbar: {db_error}")
-                return {
-                    "analysis_date": current_date,
-                    "total_expired_found": 0,
-                    "expired_by_store": {},
-                    "expired_products": [],
-                    "action_taken": "dry_run",
-                    "error": "Database not available - using mock data",
-                    "note": "Database connection failed. Please check database configuration."
-                }
+                )
+                
+                result = await db.execute(expired_query)
+                expired_products = result.scalars().all()
                 
                 # Analysiere Ergebnisse
                 stats = {
