@@ -3,12 +3,15 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.core.database import get_async_session_rw
 from shared.services.database_service import DatabaseService
-from ..services.scheduler_service import scheduler_service
-from ..services.crawler_service import CrawlerService
-from ..services.crawl_status_service import crawl_status_service, CrawlType, CrawlStatus
-from ..services.cleanup_service import cleanup_service
+from services.scheduler_service import scheduler_service
+from services.crawler_service import CrawlerService
+from services.crawl_status_service import crawl_status_service, CrawlType, CrawlStatus
+from services.cleanup_service import cleanup_service
 
 logger = logging.getLogger(__name__)
 

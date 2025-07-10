@@ -6,9 +6,12 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from apscheduler.jobstores.memory import MemoryJobStore
 
-from ..core.config import settings
-from ..core.database import async_session_maker
-from .database_service import DatabaseService
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from shared.core.config import settings
+from shared.core.database import async_session_maker_rw
+from shared.services.database_service import DatabaseService
 from .crawler_service import CrawlerService
 
 logger = logging.getLogger(__name__)
@@ -119,7 +122,7 @@ class SchedulerService:
         logger.info("Starting weekly crawl job...")
         
         try:
-            async with async_session_maker() as session:
+            async with async_session_maker_rw() as session:
                 db_service = DatabaseService(session)
                 crawler_service = CrawlerService(db_service)
                 
@@ -193,7 +196,7 @@ class SchedulerService:
         logger.info("Starting daily cleanup job...")
         
         try:
-            async with async_session_maker() as session:
+            async with async_session_maker_rw() as session:
                 db_service = DatabaseService(session)
                 
                 # Hard delete old soft-deleted products (older than 30 days)

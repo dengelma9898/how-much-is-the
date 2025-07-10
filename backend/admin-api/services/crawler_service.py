@@ -3,11 +3,14 @@ from datetime import datetime, timedelta
 from typing import List, Tuple, Dict, Any, Optional
 from decimal import Decimal
 
-from .database_service import DatabaseService
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from shared.services.database_service import DatabaseService
 from .lidl_crawler_ultimate import LidlUltimateCrawler
 from .crawl_status_service import crawl_status_service, CrawlStatus
-from ..models.search import ProductResult
-from ..core.config import settings
+from shared.models.search import ProductResult
+from shared.core.config import settings
 
 logger = logging.getLogger(__name__)
 

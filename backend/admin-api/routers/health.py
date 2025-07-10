@@ -1,10 +1,13 @@
 import logging
 from fastapi import APIRouter, HTTPException
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.core.database import async_session_maker_rw
 from shared.services.database_service import DatabaseService
-from ..services.scheduler_service import scheduler_service
-from ..services.crawl_status_service import crawl_status_service
+from services.scheduler_service import scheduler_service
+from services.crawl_status_service import crawl_status_service
 
 logger = logging.getLogger(__name__)
 

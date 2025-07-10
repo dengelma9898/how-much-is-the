@@ -1,6 +1,9 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.core.database import get_async_session_ro
 from shared.services.database_service import DatabaseService
 

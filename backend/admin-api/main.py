@@ -3,11 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import admin, health
+from routers import admin, health
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from shared.core.config import settings
 from shared.core.database import create_db_and_tables, close_db, async_session_maker_rw
 from shared.services.database_service import DatabaseService
-from .services.scheduler_service import scheduler_service
+from services.scheduler_service import scheduler_service
 
 # Configure logging
 logging.basicConfig(

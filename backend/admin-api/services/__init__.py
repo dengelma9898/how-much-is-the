@@ -1,1 +1,3 @@
-# Services Package 
+"""
+Admin API services
+""" 

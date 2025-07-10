@@ -2,6 +2,9 @@ import logging
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.models.search import SearchRequest, SearchResponse, StoresResponse, Store
 from shared.core.database import get_async_session_ro
 from shared.services.database_service import DatabaseService

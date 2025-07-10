@@ -9,8 +9,11 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.database import async_session_maker
-from ..models.database_models import DatabaseProduct
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
+from shared.core.database import async_session_maker_rw
+from shared.models.database_models import DatabaseProduct
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,7 @@ class CleanupService:
         try:
             current_date = datetime.now().date().strftime('%Y-%m-%d')
             
-            async with async_session_maker() as db:
+            async with async_session_maker_rw() as db:
                 # Finde abgelaufene Angebote
                 from sqlalchemy import select
                 expired_query = select(DatabaseProduct).filter(
