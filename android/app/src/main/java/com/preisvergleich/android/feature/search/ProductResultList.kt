@@ -19,8 +19,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.preisvergleich.android.data.model.ProductResult
-import java.text.NumberFormat
-import java.util.*
 
 @Composable
 fun ProductResultList(
@@ -97,29 +95,25 @@ private fun ProductResultCard(
                     )
                 }
                 
-                // Verfügbarkeit
-                if (product.availability.isNotBlank()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (product.availability.lowercase().contains("verfügbar")) 
-                                        MaterialTheme.colorScheme.primary 
-                                    else 
-                                        MaterialTheme.colorScheme.error
-                                )
-                        )
-                        Text(
-                            text = product.availability,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                // Unit-Information
+                if (!product.unit.isNullOrBlank()) {
+                    Text(
+                        text = product.unit,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Removed availability text as it's redundant when product is shown
+                
+                // Angebotsgültigkeit
+                if (!product.offerValidUntil.isNullOrBlank()) {
+                    Text(
+                        text = "Gültig bis: ${product.offerValidUntil}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
             
@@ -129,15 +123,15 @@ private fun ProductResultCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
-                    text = formatPrice(product.price),
+                    text = "${product.price}€",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
                 
-                if (product.pricePerUnit != null && product.unit != null) {
+                if (product.pricePerUnit != null) {
                     Text(
-                        text = "${formatPrice(product.pricePerUnit)}/${product.unit}",
+                        text = "${formatPrice(product.pricePerUnit)}/Einheit",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -148,6 +142,5 @@ private fun ProductResultCard(
 }
 
 private fun formatPrice(price: java.math.BigDecimal): String {
-    val format = NumberFormat.getCurrencyInstance(Locale.GERMANY)
-    return format.format(price.toDouble())
+    return "${price}€"
 } 

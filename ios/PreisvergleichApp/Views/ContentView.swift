@@ -582,14 +582,21 @@ struct ProductRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Product Image Placeholder
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Image(systemName: "photo")
-                        .foregroundColor(.gray)
-                )
+            // Product Image
+            AsyncImage(url: URL(string: product.imageUrl ?? "")) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.gray)
+                    )
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
             
             // Product Info
             VStack(alignment: .leading, spacing: 4) {
@@ -602,23 +609,34 @@ struct ProductRowView: View {
                     .font(.subheadline)
                     .foregroundColor(.blue)
                 
-                Text(product.availability)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Unit information
+                if let unit = product.unit, !unit.isEmpty {
+                    Text(unit)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Offer validity (removed availability text as it's redundant)
+                if let offerValidUntil = product.offerValidUntil, !offerValidUntil.isEmpty {
+                    Text("Gültig bis: \(offerValidUntil)")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .fontWeight(.medium)
+                }
             }
             
             Spacer()
             
             // Price
-            VStack(alignment: .trailing) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(product.price)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.green)
                 
                 Text("€")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.title3)
+                    .foregroundColor(.green)
             }
         }
         .padding()

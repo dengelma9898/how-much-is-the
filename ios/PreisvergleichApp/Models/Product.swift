@@ -26,6 +26,8 @@ struct ProductResult: Codable, Identifiable {
     let imageUrl: String?
     let availability: String
     let pricePerUnit: String?
+    let unit: String?
+    let offerValidUntil: String?
     
     private enum CodingKeys: String, CodingKey {
         case name, price, store, availability
@@ -33,6 +35,8 @@ struct ProductResult: Codable, Identifiable {
         case productUrl = "product_url"
         case imageUrl = "image_url"
         case pricePerUnit = "price_per_unit"
+        case unit
+        case offerValidUntil = "offer_valid_until"
     }
 }
 

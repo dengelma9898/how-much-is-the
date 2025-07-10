@@ -20,8 +20,7 @@ data class SearchRequest(
 @Serializable
 data class ProductResult(
     val name: String,
-    @Serializable(with = BigDecimalSerializer::class)
-    val price: BigDecimal,
+    val price: String,
     val store: String,
     @SerialName("store_logo_url")
     val storeLogoUrl: String? = null,
@@ -33,7 +32,9 @@ data class ProductResult(
     val unit: String? = null,
     @SerialName("price_per_unit")
     @Serializable(with = BigDecimalSerializer::class)
-    val pricePerUnit: BigDecimal? = null
+    val pricePerUnit: BigDecimal? = null,
+    @SerialName("offer_valid_until")
+    val offerValidUntil: String? = null
 )
 
 @Serializable

@@ -12,12 +12,12 @@ class SearchRequest(BaseModel):
 class ProductResult(BaseModel):
     """Modell für ein Suchergebnis"""
     name: str = Field(..., description="Produktname")
-    price: Optional[float] = Field(None, ge=0, description="Preis in Euro")
+    price: Optional[str] = Field(None, description="Preis in Euro als String")
     store: str = Field(..., description="Name des Supermarkts")
     store_logo_url: Optional[str] = Field(None, description="URL zum Store-Logo")
     product_url: Optional[str] = Field(None, description="URL zum Produkt")
     image_url: Optional[str] = Field(None, description="URL zum Produktbild")
-    availability: bool = Field(default=True, description="Verfügbarkeitsstatus im Store")
+    availability: str = Field(default="verfügbar", description="Verfügbarkeitsstatus im Store")
     availability_text: Optional[str] = Field(None, description="Verfügbarkeitstext vom Store (z.B. 'nur in der Filiale 07.07. - 12.07.')")
     offer_valid_until: Optional[str] = Field(None, description="Bis wann das Angebot gültig ist (für Datenbereinigung)")
     unit: Optional[str] = Field(None, description="Einheit/Verpackung (z.B. '1L', '500g', 'Stück')")

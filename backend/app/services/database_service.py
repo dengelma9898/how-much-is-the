@@ -296,18 +296,22 @@ class DatabaseService:
         # Convert to Pydantic models
         result = []
         for db_product in db_products:
+            # Convert boolean availability to string for app compatibility
+            availability_text = "verfügbar" if db_product.availability else "nicht verfügbar"
+            
             product = ProductResult(
                 name=db_product.name,
-                price=float(db_product.price) if db_product.price else None,
+                price=str(db_product.price) if db_product.price else None,  # Convert to string for iOS compatibility
                 unit=db_product.unit,
                 image_url=db_product.image_url,
                 product_url=db_product.product_url,
                 description=db_product.description,
                 store=db_product.store.name,  # Just the store name, not Store object
                 store_logo_url=db_product.store.logo_url,
-                availability=db_product.availability,
+                availability=availability_text,  # Convert boolean to string for app compatibility
                 brand=db_product.brand,
-                category=db_product.category
+                category=db_product.category,
+                offer_valid_until=db_product.offer_valid_until  # Add missing offer_valid_until field
             )
             result.append(product)
         
