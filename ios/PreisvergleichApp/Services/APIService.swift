@@ -48,8 +48,8 @@ class APIService {
     static let shared = APIService()
     private let session = URLSession.shared
     
-    // Backend-Konfiguration
-    private let baseURL = "http://localhost:8000/api/v1"
+    // Backend-Konfiguration - Client API (read-only)
+    private let baseURL = "http://localhost:8001/api/v1"
     
     private init() {}
     

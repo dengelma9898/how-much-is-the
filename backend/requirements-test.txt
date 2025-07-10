@@ -1,0 +1,32 @@
+# Test Dependencies für Preisvergleich Split Backend Architecture
+
+# Core Testing Framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+
+# API Testing
+httpx>=0.24.0
+requests>=2.28.0
+
+# Database Testing
+pytest-postgresql>=5.0.0
+alembic>=1.8.0
+
+# Performance & Timeouts
+pytest-timeout>=2.1.0
+pytest-benchmark>=4.0.0
+
+# Code Quality
+flake8>=5.0.0
+black>=22.0.0
+isort>=5.10.0
+
+# HTML/Web Testing (für Crawler-Tests)
+beautifulsoup4>=4.11.0
+lxml>=4.9.0
+
+# Development
+ipdb>=0.13.0
+factory-boy>=3.2.0 

@@ -1,0 +1,275 @@
+# Preisvergleich Admin API Test Collection
+# 
+# Diese Datei testet die Admin-API für System-Management, Crawling und Wartung
+# Basis-URL: http://127.0.0.1:8002 (Admin API)
+# 
+# Anweisungen:
+# 1. Installiere die "REST Client" Extension in VS Code
+# 2. Starte die Admin-API: cd backend && ./start-admin-api.sh
+# 3. Klicke auf "Send Request" über jeder HTTP-Anfrage
+# 4. ⚠️ VORSICHT: Diese API kann Daten ändern und Crawls starten!
+
+@adminBaseUrl = http://127.0.0.1:8002
+
+### ============================================
+### HEALTH & INFO ENDPOINTS
+### ============================================
+
+### 1. API Root - Grundlegende Informationen
+GET {{adminBaseUrl}}/
+
+### 2. Health Check - Status überprüfen
+GET {{adminBaseUrl}}/api/v1/health
+
+### 3. OpenAPI Docs (JSON)
+GET {{adminBaseUrl}}/openapi.json
+
+### ============================================
+### STORE MANAGEMENT (ADMIN)
+### ============================================
+
+### 4. Alle verfügbaren Stores auflisten
+GET {{adminBaseUrl}}/api/v1/stores
+
+### 5. Standard-Stores initialisieren (Admin)
+POST {{adminBaseUrl}}/api/v1/admin/stores/initialize
+
+### ============================================
+### SYSTEM MONITORING & OVERVIEW
+### ============================================
+
+### 6. System-Übersicht (Admin Dashboard)
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 7. Erweiterte System-Monitoring mit Details
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### ============================================
+### CRAWLING SYSTEM MANAGEMENT
+### ============================================
+
+### 8. Crawl-Status Übersicht
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status/overview
+
+### 9. Manueller Crawl für Lidl starten
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
+
+### 10. Manueller Crawl für Aldi starten
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Aldi&postal_code=10115
+
+### 11. Manueller Crawl für alle Stores
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?postal_code=10115
+
+### 12. Crawl-Status für spezifischen Store (Lidl)
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Lidl/status
+
+### 13. Crawl-Status für spezifischen Store (Aldi)
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Aldi/status
+
+### 14. Detaillierter Crawl-Status (verwende crawl_id aus vorherigen Responses)
+# Ersetze {crawl_id} mit tatsächlicher ID aus Response
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status/12345678-1234-5678-9abc-123456789abc
+
+### 15. Crawl abbrechen (verwende crawl_id aus vorherigen Responses)
+# Ersetze {crawl_id} mit tatsächlicher ID
+DELETE {{adminBaseUrl}}/api/v1/admin/crawl/12345678-1234-5678-9abc-123456789abc
+
+### ============================================
+### LEGACY ADMIN ENDPOINTS
+### ============================================
+
+### 16. Alter Crawl-Status (Legacy)
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status
+
+### ============================================
+### DATABASE CLEANUP SYSTEM
+### ============================================
+
+### 17. Cleanup-Statistiken anzeigen
+GET {{adminBaseUrl}}/api/v1/admin/cleanup/statistics
+
+### 18. Datenbank-Cleanup (Allgemein - Legacy)
+POST {{adminBaseUrl}}/api/v1/admin/crawl/cleanup
+
+### 19. Abgelaufene Angebote bereinigen (Dry Run)
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/expired?dry_run=true&triggered_by=test_user
+
+### 20. Abgelaufene Angebote bereinigen (REAL - ACHTUNG!)
+# POST {{adminBaseUrl}}/api/v1/admin/cleanup/expired?dry_run=false&triggered_by=admin_user
+
+### 21. Alte Produkte bereinigen (Dry Run - 30 Tage)
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/old-products?days_old=30&dry_run=true&triggered_by=test_user
+
+### 22. Alte Produkte bereinigen (Dry Run - 60 Tage)
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/old-products?days_old=60&dry_run=true&triggered_by=test_user
+
+### 23. Aggressive Bereinigung Test (7 Tage - Nur Dry Run!)
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/old-products?days_old=7&dry_run=true&triggered_by=cleanup_test
+
+### ============================================
+### CRAWL TESTING SCENARIOS
+### ============================================
+
+### 24. Rate Limiting Test - Mehrere Crawls schnell hintereinander
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
+
+###
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
+
+### 25. Concurrent Crawl Test - Verschiedene Stores gleichzeitig
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
+
+###
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Aldi&postal_code=10115
+
+### 26. Crawl mit verschiedenen Postleitzahlen
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=80331
+
+###
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Aldi&postal_code=20095
+
+### ============================================
+### ERROR TESTING (ADMIN)
+### ============================================
+
+### 27. Ungültiger Store-Name
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=InvalidStore&postal_code=10115
+
+### 28. Fehlende Parameter
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger
+
+### 29. Ungültige Postleitzahl für Crawl
+POST {{adminBaseUrl}}/api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=invalid
+
+### 30. Cleanup mit ungültigen Parametern
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/old-products?days_old=abc&dry_run=true&triggered_by=test
+
+### ============================================
+### ADVANCED ADMIN OPERATIONS
+### ============================================
+
+### 31. System-Status vor Wartungsarbeiten
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 32. Store-Statistiken für alle Stores
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Lidl/status
+
+###
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Aldi/status
+
+### 33. Cleanup-Statistiken vor Bereinigung
+GET {{adminBaseUrl}}/api/v1/admin/cleanup/statistics
+
+### 34. Crawl-Status-Übersicht nach Tests
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status/overview
+
+### ============================================
+### DEVELOPMENT & DEBUGGING
+### ============================================
+
+### 35. Store-Initialisierung prüfen
+GET {{adminBaseUrl}}/api/v1/stores
+
+### 36. System-Overview für Debugging
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 37. Crawl-Logs und Status für Debugging
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status/overview
+
+### ============================================
+### PRODUCTION MAINTENANCE WORKFLOWS
+### ============================================
+
+### 38. Wöchentliche Wartung - Schritt 1: Status prüfen
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 39. Wöchentliche Wartung - Schritt 2: Cleanup-Stats
+GET {{adminBaseUrl}}/api/v1/admin/cleanup/statistics
+
+### 40. Wöchentliche Wartung - Schritt 3: Dry Run Cleanup
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/expired?dry_run=true&triggered_by=weekly_maintenance
+
+### 41. Wöchentliche Wartung - Schritt 4: Alte Produkte (60 Tage)
+POST {{adminBaseUrl}}/api/v1/admin/cleanup/old-products?days_old=60&dry_run=true&triggered_by=weekly_maintenance
+
+### 42. Nach-Wartung Status Check
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### ============================================
+### EMERGENCY PROCEDURES
+### ============================================
+
+### 43. Notfall: Alle aktiven Crawls prüfen
+GET {{adminBaseUrl}}/api/v1/admin/crawl/status/overview
+
+### 44. Notfall: System-Status prüfen
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 45. Notfall: Spezifischen Crawl abbrechen (ID anpassen!)
+# DELETE {{adminBaseUrl}}/api/v1/admin/crawl/EMERGENCY-CRAWL-ID-HERE
+
+### ============================================
+### MONITORING & ALERTS
+### ============================================
+
+### 46. Performance Monitoring
+GET {{adminBaseUrl}}/api/v1/admin/system/overview
+
+### 47. Store Health Check
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Lidl/status
+
+###
+GET {{adminBaseUrl}}/api/v1/admin/crawl/store/Aldi/status
+
+### 48. Database Health via Cleanup Stats
+GET {{adminBaseUrl}}/api/v1/admin/cleanup/statistics
+
+### ============================================
+### NOTES & WARNINGS
+### ============================================
+
+# 🚨 ADMIN API - WICHTIGE HINWEISE:
+# 
+# ⚠️ GEFÄHRLICHE OPERATIONEN:
+# - Crawl-Trigger können echte Store-Crawls starten
+# - Cleanup-Operationen ohne dry_run=true löschen Daten
+# - Rate Limits beachten: 5 Min zwischen Crawls pro Store
+# - Concurrent Crawls belasten System und externe APIs
+# 
+# 🔧 Verwendung:
+# 
+# 1. Starte IMMER mit Health Check: GET /api/v1/health
+# 2. Prüfe System-Status: GET /api/v1/admin/system/overview
+# 3. Verwende dry_run=true bei allen Cleanup-Tests
+# 4. Überwache Crawl-Status nach dem Triggern
+# 5. Beende hängende Crawls mit DELETE /api/v1/admin/crawl/{id}
+# 
+# 📊 Wichtige Endpunkte:
+# 
+# - /health: API-Status prüfen
+# - /admin/system/overview: Vollständiger System-Status
+# - /admin/crawl/status/overview: Alle Crawl-Stati
+# - /admin/cleanup/statistics: Datenbank-Gesundheit
+# 
+# 🚨 Error Codes:
+# 
+# - 404: Endpoint nicht gefunden → Admin-API läuft nicht
+# - 409: Conflict → Crawl bereits aktiv für Store
+# - 422: Validation Error → Parameter fehlen/ungültig
+# - 429: Rate Limited → Zu viele Requests, 5 Min warten
+# - 500: Server Error → Backend-Logs prüfen, mögl. Crawler-Problem
+# 
+# 💡 Best Practices:
+# 
+# - Nie Cleanup ohne dry_run=true in Produktion
+# - Crawls nur bei Bedarf triggern (automatischer Scheduler läuft)
+# - System-Overview regelmäßig überwachen
+# - Crawl-IDs aus Responses für Status-Tracking nutzen
+# - Bei Problemen: Crawls stoppen, System-Status prüfen
+# 
+# 🔒 Sicherheit:
+# 
+# - Diese API sollte NIE öffentlich zugänglich sein
+# - Nur für interne Admin-Tools und Entwicklung
+# - Produktive Cleanup-Operationen nur nach Tests
+# - Backup vor großen Cleanup-Aktionen 

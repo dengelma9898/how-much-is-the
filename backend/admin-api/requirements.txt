@@ -1,0 +1,22 @@
+# Admin API Dependencies - Read-write with all features
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# Crawler dependencies
+requests==2.31.0
+beautifulsoup4==4.12.2
+selenium==4.15.2
+aiohttp==3.9.1
+
+# Scheduler
+apscheduler==3.10.4
+
+# Monitoring and logging
+python-dotenv==1.0.0
+
+# Shared dependencies
+../shared/ 

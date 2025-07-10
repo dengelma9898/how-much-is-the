@@ -1,0 +1,282 @@
+# Preisvergleich Client API Test Collection
+# 
+# Diese Datei testet die Client-API, die für mobile Apps und Frontend verwendet wird
+# Basis-URL: http://127.0.0.1:8001(Client API)
+# 
+# Anweisungen:
+# 1. Installiere die "REST Client" Extension in VS Code
+# 2. Starte die Client-API: cd backend && ./start-client-api.sh
+# 3. Klicke auf "Send Request" über jeder HTTP-Anfrage
+# 4. Passe Parameter nach Bedarf an
+
+@clientBaseUrl = http://127.0.0.1:8001
+
+### ============================================
+### HEALTH & INFO ENDPOINTS
+### ============================================
+
+### 1. API Root - Grundlegende Informationen
+GET {{clientBaseUrl}}/
+
+### 2. Health Check - Status überprüfen
+GET {{clientBaseUrl}}/api/v1/health
+
+### 3. OpenAPI Docs (JSON)
+GET {{clientBaseUrl}}/openapi.json
+
+### ============================================
+### STORE MANAGEMENT (READ-ONLY)
+### ============================================
+
+### 4. Alle verfügbaren Stores auflisten
+GET {{clientBaseUrl}}/api/v1/stores
+
+### ============================================
+### SEARCH ENDPOINTS
+### ============================================
+
+### 5. Produktsuche in der Datenbank (Einfach)
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch&postal_code=10115
+
+### 6. Produktsuche in der Datenbank mit Filtern
+GET {{clientBaseUrl}}/api/v1/search/database?query=Bio Äpfel&postal_code=10115&store_name=Lidl&min_price=1.0&max_price=5.0
+
+### 7. Vollständige Produktsuche (Datenbank + Live)
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Hafermilch",
+  "postal_code": "10115",
+  "store_preferences": ["Lidl", "Aldi"],
+  "price_filter": {
+    "min_price": 0.5,
+    "max_price": 3.0
+  }
+}
+
+### 8. Produktsuche mit erweiterten Filtern
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Bio Vollkornbrot",
+  "postal_code": "80331",
+  "store_preferences": ["Lidl"],
+  "price_filter": {
+    "min_price": 1.0,
+    "max_price": 4.0
+  },
+  "include_unavailable": false
+}
+
+### ============================================
+### SPECIAL CHARACTER & ENCODING TESTS
+### ============================================
+
+### 9. Produktsuche mit Umlauten
+GET {{clientBaseUrl}}/api/v1/search/database?query=Käse&postal_code=80331
+
+### 10. Produktsuche mit Leerzeichen (URL-encoded)
+GET {{clientBaseUrl}}/api/v1/search/database?query=Vollkorn%20Brot&postal_code=80331
+
+### 11. Produktsuche mit Sonderzeichen
+GET {{clientBaseUrl}}/api/v1/search/database?query=Müsli&postal_code=10115
+
+### ============================================
+### DIFFERENT POSTAL CODES
+### ============================================
+
+### 12. Berlin Mitte
+GET {{clientBaseUrl}}/api/v1/search/database?query=Hafermilch&postal_code=10115
+
+### 13. München
+GET {{clientBaseUrl}}/api/v1/search/database?query=Hafermilch&postal_code=80331
+
+### 14. Hamburg
+GET {{clientBaseUrl}}/api/v1/search/database?query=Hafermilch&postal_code=20095
+
+### 15. Köln
+GET {{clientBaseUrl}}/api/v1/search/database?query=Hafermilch&postal_code=50667
+
+### ============================================
+### MULTIPLE SEARCH TERMS
+### ============================================
+
+### 16. Grundnahrungsmittel Tests
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch&postal_code=10115
+
+###
+GET {{clientBaseUrl}}/api/v1/search/database?query=Brot&postal_code=10115
+
+###
+GET {{clientBaseUrl}}/api/v1/search/database?query=Käse&postal_code=10115
+
+###
+GET {{clientBaseUrl}}/api/v1/search/database?query=Joghurt&postal_code=10115
+
+### ============================================
+### COMPLEX SEARCH SCENARIOS
+### ============================================
+
+### 17. Komplexe Suchanfrage mit vielen Parametern
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Bio Vollkorn Haferflocken glutenfrei",
+  "postal_code": "10115",
+  "store_preferences": ["Lidl", "Aldi"],
+  "price_filter": {
+    "min_price": 1.0,
+    "max_price": 8.0
+  },
+  "include_unavailable": true
+}
+
+### 18. Minimale Suchanfrage
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Milch",
+  "postal_code": "10115"
+}
+
+### 19. Suchanfrage nur mit Lidl
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Vollkornbrot",
+  "postal_code": "10115",
+  "store_preferences": ["Lidl"]
+}
+
+### 20. Suchanfrage nur mit Aldi
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Frischkäse",
+  "postal_code": "10115",
+  "store_preferences": ["Aldi"]
+}
+
+### ============================================
+### ERROR TESTING
+### ============================================
+
+### 21. Ungültige Postleitzahl
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch&postal_code=invalid
+
+### 22. Leere Suchanfrage
+GET {{clientBaseUrl}}/api/v1/search/database?query=&postal_code=10115
+
+### 23. Fehlende Postleitzahl
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch
+
+### 24. Ungültiger Store-Name im Filter
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch&postal_code=10115&store_name=InvalidStore
+
+### 25. Ungültiger Preis-Filter
+GET {{clientBaseUrl}}/api/v1/search/database?query=Milch&postal_code=10115&min_price=abc&max_price=xyz
+
+### ============================================
+### PERFORMANCE TESTING
+### ============================================
+
+### 26. Sehr kurzer Suchbegriff
+GET {{clientBaseUrl}}/api/v1/search/database?query=a&postal_code=10115
+
+### 27. Sehr langer Suchbegriff
+GET {{clientBaseUrl}}/api/v1/search/database?query=BioVollkornHaferflockenGlutenfrei&postal_code=10115
+
+### 28. Suchanfrage mit vielen Filtern
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Bio",
+  "postal_code": "10115",
+  "store_preferences": ["Lidl", "Aldi"],
+  "price_filter": {
+    "min_price": 0.1,
+    "max_price": 100.0
+  },
+  "include_unavailable": true
+}
+
+### ============================================
+### MOBILE APP SCENARIOS
+### ============================================
+
+### 29. Schnelle Produktsuche (Typischer Mobile Use Case)
+GET {{clientBaseUrl}}/api/v1/search/database?query=Apfel&postal_code=10115&store_name=Lidl
+
+### 30. Preisvergleich zwischen Stores
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Hafermilch",
+  "postal_code": "10115",
+  "store_preferences": ["Lidl", "Aldi"]
+}
+
+### 31. Budget-bewusste Suche
+POST {{clientBaseUrl}}/api/v1/search
+Content-Type: application/json
+
+{
+  "query": "Joghurt",
+  "postal_code": "10115",
+  "price_filter": {
+    "max_price": 2.0
+  }
+}
+
+### ============================================
+### NOTES & TIPS
+### ============================================
+
+# 📱 Client API - Hinweise:
+# 
+# Diese API ist für mobile Apps und Frontend-Anwendungen optimiert:
+# - Read-Only Zugriff auf Produktdaten
+# - Keine Admin-Funktionen (Crawling, Cleanup)
+# - Optimiert für schnelle Suchanfragen
+# - Rate-Limiting für Client-Apps
+# 
+# 🔧 Verwendung:
+# 
+# 1. VS Code REST Client Extension:
+#    - Installiere "REST Client" Extension
+#    - Öffne diese Datei
+#    - Klicke "Send Request" über jeder Anfrage
+# 
+# 2. Postman/Insomnia:
+#    - Kopiere einzelne Requests
+#    - Passe Base-URL an falls nötig
+# 
+# 📊 Erwartete Responses:
+# 
+# - /health: {"status": "healthy", "timestamp": "..."}
+# - /stores: [{"id": 1, "name": "Lidl", ...}, ...]
+# - /search/database: {"results": [...], "total": N, ...}
+# - /search: {"results": [...], "total": N, "sources": [...]}
+# 
+# 🚨 Error Codes:
+# 
+# - 404: Endpoint nicht gefunden → Client-API läuft nicht
+# - 422: Validation Error → Parameter fehlen oder ungültig  
+# - 429: Rate Limited → Zu viele Requests von Client
+# - 500: Server Error → Backend-Logs prüfen
+# 
+# 💡 Best Practices:
+# 
+# - Starte mit /health um API-Status zu prüfen
+# - Verwende spezifische Postleitzahlen für bessere Ergebnisse
+# - Nutze store_preferences für gezielte Suchen
+# - include_unavailable=false für bessere UX
+# - Kurze Suchbegriffe für mobile Keyboards optimiert 
