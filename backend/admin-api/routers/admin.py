@@ -219,11 +219,11 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
         )
         
         # Create a new database session for this background task
-        from ..core.database import async_session_maker
-        from ..services.database_service import DatabaseService
-        from ..services.crawler_service import CrawlerService
+        from shared.core.database import async_session_maker_rw
+        from shared.services.database_service import DatabaseService
+        from services.crawler_service import CrawlerService
         
-        async with async_session_maker() as session:
+        async with async_session_maker_rw() as session:
             db_service = DatabaseService(session)
             crawler_service = CrawlerService(db_service)
             

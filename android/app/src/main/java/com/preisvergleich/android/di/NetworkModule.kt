@@ -60,7 +60,7 @@ abstract class NetworkModule {
             json: Json
         ): Retrofit {
             return Retrofit.Builder()
-                .baseUrl("http://10.0.2.2:8000/") // Android emulator localhost
+                .baseUrl("http://10.0.2.2:8001/") // Android emulator Client API (read-only)
                 .client(okHttpClient)
                 .addConverterFactory(
                     json.asConverterFactory("application/json".toMediaType())

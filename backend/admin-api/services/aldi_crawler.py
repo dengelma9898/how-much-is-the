@@ -10,8 +10,8 @@ import re
 import urllib.parse
 from decimal import Decimal, InvalidOperation
 from typing import List, Optional, Dict, Any
-from app.models.search import ProductResult
-from app.core.config import settings
+from shared.models.search import ProductResult
+from shared.core.config import settings
 
 logger = logging.getLogger(__name__)
 

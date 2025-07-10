@@ -1,7 +1,7 @@
 import random
 from decimal import Decimal
 from typing import List
-from app.models.search import ProductResult, Store
+from shared.models.search import ProductResult, Store
 
 class MockDataService:
     """Service für Mock-Daten während der Entwicklung"""

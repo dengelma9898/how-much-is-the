@@ -1,11 +1,47 @@
 #!/bin/bash
 
-# Start script for Admin API (Read-write)
-echo "Starting Preisvergleich Admin API..."
+# Admin API Start Script mit Environment-Parameter
+# Usage: ./start-admin-api.sh [env]
+# Example: ./start-admin-api.sh prod
+#          ./start-admin-api.sh dev
+#          ./start-admin-api.sh (uses 'local' as default)
 
-# Set environment variables
-export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+ENV=${1:-local}
+PORT=8002
+HOST=0.0.0.0
 
-# Start the Admin API on port 8002
+# Determine environment file (admin-specific first)
+if [ -f ".env.admin" ]; then
+    ENV_FILE=".env.admin"
+    echo "📋 Using admin environment: $ENV_FILE"
+    # Load admin-specific environment
+    set -a && source .env.admin && set +a
+elif [ -f ".env.${ENV}" ]; then
+    ENV_FILE=".env.${ENV}"
+    echo "📋 Using general environment: $ENV_FILE"
+    set -a && source .env.${ENV} && set +a
+else
+    echo "⚠️  No environment file found!"
+    echo "💡 Create admin environment:"
+    echo "   cp env.admin.example .env.admin"
+    echo "📝 Then edit .env.admin with your settings"
+    exit 1
+fi
+
+echo "🚀 Starting Preisvergleich Admin API..."
+echo "📂 Environment: $ENV ($ENV_FILE)"
+echo "🌐 Port: $PORT"
+echo "🔓 Access Level: READ-WRITE"
+echo "⚙️  Features: Scheduler, Crawler, Administration"
+echo ""
+
 cd admin-api
-uvicorn main:app --host 0.0.0.0 --port 8002 --reload 
+
+# Set environment variable for the app to pick up
+export APP_ENV=$ENV
+
+# Start the API with ARM64 Python
+arch -arm64 python3 -m uvicorn main:app --host $HOST --port $PORT --reload
+
+echo ""
+echo "✅ Admin API stopped" 

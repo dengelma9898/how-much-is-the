@@ -33,16 +33,27 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
     debug: bool = False
     
-    # CORS Settings
-    backend_cors_origins: list = ["http://localhost:3000", "http://localhost:8000"]
+    # API Server Configuration
+    client_api_port: int = 8001
+    client_api_host: str = "0.0.0.0"
+    admin_api_port: int = 8002
+    admin_api_host: str = "0.0.0.0"
     
-    # Database Settings
+    # CORS Settings
+    backend_cors_origins: list = ["http://localhost:3000", "http://localhost:8001"]
+    admin_cors_origins: Optional[list] = None  # Falls nicht gesetzt, wird backend_cors_origins verwendet
+    
+    # Database Settings (Split Architecture)
     database_url: str = os.getenv(
         "DATABASE_URL", 
         # Default: Generic PostgreSQL URL for development
         # For Homebrew PostgreSQL on Mac, use your username instead of 'preisvergleich_user'
         f"postgresql+asyncpg://{os.getenv('USER', 'preisvergleich_user')}:@localhost:5432/preisvergleich_dev"
     )
+    
+    # Read-only Database URL für Client API
+    database_url_readonly: Optional[str] = os.getenv("DATABASE_URL_READONLY")
+    
     database_echo: bool = False
     
     # Crawler Settings
@@ -91,8 +102,36 @@ class Settings(BaseSettings):
     admin_max_log_entries: int = 100
 
     class Config:
-        env_file = ".env"
+        # Dynamic env_file loading für Split-Architecture
+        @staticmethod
+        def env_file():
+            # Bestimme das Backend-Verzeichnis (ein Level über dem aktuellen wenn in client-api/ oder admin-api/)
+            current_dir = os.getcwd()
+            backend_dir = current_dir if not (current_dir.endswith('client-api') or current_dir.endswith('admin-api')) else os.path.dirname(current_dir)
+            
+            # Prüfe nach spezifischen API Environment-Dateien basierend auf dem aktuellen Arbeitsverzeichnis
+            client_env = os.path.join(backend_dir, ".env.client")
+            admin_env = os.path.join(backend_dir, ".env.admin")
+            
+            # Entscheide basierend auf dem aktuellen Arbeitsverzeichnis
+            if current_dir.endswith('client-api') and os.path.exists(client_env):
+                return client_env
+            elif current_dir.endswith('admin-api') and os.path.exists(admin_env):
+                return admin_env
+            elif os.path.exists(client_env):
+                return client_env  # Client als Fallback wenn beide existieren
+            elif os.path.exists(admin_env):
+                return admin_env
+            else:
+                # Fallback auf allgemeine Environment-Datei
+                app_env = os.getenv("APP_ENV", "local")
+                env_file = os.path.join(backend_dir, f".env.{app_env}")
+                if os.path.exists(env_file):
+                    return env_file
+                else:
+                    return os.path.join(backend_dir, ".env")  # Last fallback
+        
         case_sensitive = False
 
 # Global settings instance
-settings = Settings() 
+settings = Settings(_env_file=Settings.Config.env_file()) 

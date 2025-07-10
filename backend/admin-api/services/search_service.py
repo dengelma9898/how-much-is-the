@@ -6,10 +6,10 @@ Der SearchService liest ausschließlich aus der Datenbank und crawlt niemals.
 import time
 import logging
 from typing import List
-from app.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
-from app.services.database_service import DatabaseService
-from app.core.database import get_async_session
-from app.services.mock_data import mock_data_service
+from shared.models.search import SearchRequest, SearchResponse, ProductResult, Store, StoresResponse
+from shared.services.database_service import DatabaseService
+from shared.core.database import get_async_session
+from .mock_data import mock_data_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class SearchService:
         """Suche in der Datenbank - KEIN CRAWLING"""
         try:
             # Verwende den korrekten async session maker
-            from app.core.database import async_session_maker
+            from shared.core.database import async_session_maker
             
             async with async_session_maker() as session:
                 db_service = DatabaseService(session)

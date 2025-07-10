@@ -13,8 +13,9 @@ engine_rw = create_async_engine(
 
 # Read-only database engine (für Client API)
 # Falls keine separate Read-only URL konfiguriert ist, verwende die normale URL
+readonly_url = settings.database_url_readonly or settings.database_url
 engine_ro = create_async_engine(
-    getattr(settings, 'database_url_readonly', settings.database_url),
+    readonly_url,
     echo=settings.database_echo,
     pool_pre_ping=True,
     pool_recycle=300,

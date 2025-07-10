@@ -11,7 +11,7 @@ from decimal import Decimal
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from playwright.async_api import async_playwright, Page, Browser
-from app.models.search import ProductResult
+from shared.models.search import ProductResult
 
 # Logger Setup
 logger = logging.getLogger(__name__)
