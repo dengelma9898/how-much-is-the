@@ -1,12 +1,13 @@
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 
 from ..core.database import get_async_session
 from ..services.database_service import DatabaseService
 from ..services.scheduler_service import scheduler_service
 from ..services.crawler_service import CrawlerService
+from ..services.crawl_status_service import crawl_status_service, CrawlType
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,79 @@ async def admin_health():
             },
             "database": {
                 "status": "connected"  # Will be checked when DB is available
+            },
+            "crawl_service": {
+                "active_crawls": len(crawl_status_service.get_active_crawls()),
+                "can_accept_new_crawls": True
             }
         }
     except Exception as e:
         logger.error(f"Admin health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+
+@router.get("/system/overview")
+async def get_system_overview():
+    """Get comprehensive system overview with enhanced metrics"""
+    try:
+        system_overview = crawl_status_service.get_system_overview()
+        scheduler_status = scheduler_service.get_job_status()
+        
+        return {
+            "system_status": "operational",
+            "crawl_service": system_overview,
+            "scheduler": scheduler_status,
+            "timestamp": "2025-01-09T20:00:00Z"  # Will be dynamic
+        }
+    except Exception as e:
+        logger.error(f"Error getting system overview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting system overview: {str(e)}")
+
+
+@router.get("/crawl/status/overview")
+async def get_crawl_overview():
+    """Get real-time overview of all crawl activities"""
+    try:
+        active_crawls = crawl_status_service.get_active_crawls()
+        recent_history = crawl_status_service.get_crawl_history(limit=10)
+        system_overview = crawl_status_service.get_system_overview()
+        
+        return {
+            "active_crawls": active_crawls,
+            "recent_completed": recent_history,
+            "summary": system_overview,
+            "refresh_interval_seconds": 5
+        }
+    except Exception as e:
+        logger.error(f"Error getting crawl overview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting crawl overview: {str(e)}")
+
+
+@router.get("/crawl/status/{crawl_id}")
+async def get_crawl_status(crawl_id: str):
+    """Get detailed status for a specific crawl operation"""
+    try:
+        status = crawl_status_service.get_crawl_status(crawl_id)
+        if not status:
+            raise HTTPException(status_code=404, detail=f"Crawl {crawl_id} not found")
+        
+        return status
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting crawl status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting crawl status: {str(e)}")
+
+
+@router.get("/crawl/store/{store_name}/status")
+async def get_store_crawl_status(store_name: str):
+    """Get comprehensive crawl status for a specific store"""
+    try:
+        status = crawl_status_service.get_store_status(store_name)
+        return status
+    except Exception as e:
+        logger.error(f"Error getting store status: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting store status: {str(e)}")
 
 
 @router.get("/scheduler/status")
@@ -80,25 +149,126 @@ async def stop_scheduler():
 async def trigger_manual_crawl(
     background_tasks: BackgroundTasks,
     store_name: Optional[str] = None,
-    postal_code: str = "10115"
+    postal_code: str = "10115",
+    triggered_by: str = Query("admin", description="Who triggered this crawl")
 ):
-    """Manually trigger crawl for specific store or all stores"""
+    """Enhanced manual crawl trigger with progress tracking"""
     try:
-        # Run crawl in background
+        # Pre-check rate limiting and store availability
+        if store_name:
+            store_status = crawl_status_service.get_store_status(store_name)
+            if not store_status["can_crawl_now"]:
+                next_allowed = store_status["next_allowed_crawl"]
+                raise HTTPException(
+                    status_code=429, 
+                    detail=f"Rate limit exceeded for {store_name}. Next crawl allowed at {next_allowed}"
+                )
+            
+            if store_status["active_crawl"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Store {store_name} is already being crawled"
+                )
+        
+        # Start crawl tracking
+        try:
+            crawl_id = crawl_status_service.start_crawl(
+                store_name=store_name or "all_stores",
+                crawl_type=CrawlType.MANUAL,
+                postal_code=postal_code,
+                triggered_by=triggered_by
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=429, detail=str(e))
+        
+        # Run enhanced crawl in background
         background_tasks.add_task(
-            scheduler_service.trigger_crawl_now,
+            _enhanced_trigger_crawl,
+            crawl_id=crawl_id,
             store_name=store_name,
             postal_code=postal_code
         )
         
         return {
             "message": f"Crawl triggered for {store_name or 'all stores'}",
+            "crawl_id": crawl_id,
             "postal_code": postal_code,
-            "status": "started"
+            "status": "started",
+            "status_endpoint": f"/api/v1/admin/crawl/status/{crawl_id}",
+            "triggered_by": triggered_by
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error triggering manual crawl: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error triggering crawl: {str(e)}")
+
+
+async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], postal_code: str):
+    """Enhanced crawl execution with progress tracking"""
+    try:
+        # Update status to initializing
+        crawl_status_service.update_crawl_progress(
+            crawl_id, 
+            status=crawl_status_service.CrawlStatus.INITIALIZING,
+            current_step="Initializing crawl session"
+        )
+        
+        # Run the actual crawl
+        results = await scheduler_service.trigger_crawl_now(
+            store_name=store_name,
+            postal_code=postal_code
+        )
+        
+        # Process results and update tracking
+        total_products = 0
+        total_errors = 0
+        all_successful = True
+        
+        for result in results:
+            if result.get("success"):
+                total_products += result.get("products_crawled", 0)
+                total_errors += result.get("errors", 0)
+            else:
+                all_successful = False
+                total_errors += 1
+        
+        # Complete the crawl tracking
+        final_status = crawl_status_service.CrawlStatus.COMPLETED if all_successful else crawl_status_service.CrawlStatus.FAILED
+        
+        crawl_status_service.complete_crawl(
+            crawl_id,
+            status=final_status,
+            final_products_count=total_products,
+            error_details=None if all_successful else f"Some stores failed. Total errors: {total_errors}"
+        )
+        
+    except Exception as e:
+        logger.error(f"Enhanced crawl {crawl_id} failed: {str(e)}")
+        crawl_status_service.complete_crawl(
+            crawl_id,
+            status=crawl_status_service.CrawlStatus.FAILED,
+            error_details=str(e)
+        )
+
+
+@router.delete("/crawl/{crawl_id}")
+async def cancel_crawl(crawl_id: str, reason: str = Query("Manual cancellation")):
+    """Cancel an active crawl operation"""
+    try:
+        success = crawl_status_service.cancel_crawl(crawl_id, reason)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Crawl {crawl_id} not found or already completed")
+        
+        return {
+            "message": f"Crawl {crawl_id} cancelled",
+            "reason": reason
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling crawl: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error cancelling crawl: {str(e)}")
 
 
 @router.post("/crawl/cleanup")

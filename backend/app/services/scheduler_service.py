@@ -208,7 +208,7 @@ class SchedulerService:
     # Manual trigger methods for admin endpoints
     
     async def trigger_crawl_now(self, store_name: str = None, postal_code: str = "10115"):
-        """Manually trigger crawl for a specific store or all stores"""
+        """Manually trigger crawl for a specific store or all stores with enhanced tracking"""
         logger.info(f"Manual crawl triggered for store: {store_name or 'all stores'}")
         
         try:
@@ -238,11 +238,15 @@ class SchedulerService:
                         crawl_session = await db_service.crawl_sessions.create(store.id)
                         await db_service.commit()
                         
-                        # Run crawler
+                        # Start tracking with crawl status service - this will be handled by the admin router
+                        # The crawl_id will be passed from the enhanced admin endpoint
+                        
+                        # Run crawler with enhanced tracking
                         success_count, error_count = await crawler_service.crawl_store(
                             store_name=store.name,
                             postal_code=postal_code,
-                            crawl_session_id=crawl_session.id
+                            crawl_session_id=crawl_session.id,
+                            crawl_id=None  # Will be set by enhanced admin endpoint
                         )
                         
                         # Update session

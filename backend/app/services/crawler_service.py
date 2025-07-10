@@ -1,34 +1,56 @@
 import logging
 from datetime import datetime, timedelta
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from decimal import Decimal
 
 from .database_service import DatabaseService
 from .lidl_crawler_ultimate import LidlUltimateCrawler
+from .crawl_status_service import crawl_status_service, CrawlStatus
 from ..models.search import ProductResult
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class CrawlerService:
-    """Service for coordinating crawlers and storing results in database"""
+    """Enhanced service for coordinating crawlers with progress tracking"""
     
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
         self.crawlers = {
             "Lidl": LidlUltimateCrawler()
         }
+        # Add Aldi crawler if enabled and Firecrawl is available
+        if settings.aldi_crawler_enabled and settings.firecrawl_enabled:
+            try:
+                from .aldi_crawler import create_aldi_crawler
+                aldi_crawler = create_aldi_crawler()
+                if aldi_crawler:
+                    self.crawlers["Aldi"] = aldi_crawler
+                    logger.info("Aldi crawler successfully initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Aldi crawler: {e}")
     
     async def crawl_store(
         self, 
         store_name: str, 
         postal_code: str, 
         crawl_session_id: int,
-        query: str = None
+        query: str = None,
+        crawl_id: Optional[str] = None,
+        progress_callback=None
     ) -> Tuple[int, int]:
         """
-        Crawl a specific store and save results to database
+        Enhanced crawl store method with progress tracking
         
+        Args:
+            store_name: Name of the store to crawl
+            postal_code: Postal code for location-specific crawling
+            crawl_session_id: Database session ID
+            query: Optional specific query to search for
+            crawl_id: Optional crawl tracking ID
+            progress_callback: Optional callback for progress updates
+            
         Returns:
             Tuple of (success_count, error_count)
         """
@@ -36,7 +58,15 @@ class CrawlerService:
         if store_name not in self.crawlers:
             raise ValueError(f"No crawler available for store: {store_name}")
         
-        logger.info(f"Starting crawl for store: {store_name}")
+        logger.info(f"Starting enhanced crawl for store: {store_name}")
+        
+        # Update progress if tracking enabled
+        if crawl_id:
+            crawl_status_service.update_crawl_progress(
+                crawl_id,
+                status=CrawlStatus.INITIALIZING,
+                current_step=f"Initializing {store_name} crawler"
+            )
         
         # Get store from database
         store = await self.db_service.stores.get_by_name(store_name)
@@ -48,21 +78,45 @@ class CrawlerService:
         error_count = 0
         
         try:
+            # Update progress
+            if crawl_id:
+                crawl_status_service.update_crawl_progress(
+                    crawl_id,
+                    status=CrawlStatus.CRAWLING,
+                    current_step="Starting product crawl",
+                    progress_percentage=10.0
+                )
+            
             # If no specific query, crawl popular/general categories
             queries_to_crawl = [query] if query else self._get_default_queries(store_name)
             
             all_products = []
+            total_queries = len(queries_to_crawl)
             
-            for search_query in queries_to_crawl:
+            for i, search_query in enumerate(queries_to_crawl):
                 try:
-                    logger.info(f"Crawling {store_name} for query: '{search_query}'")
+                    logger.info(f"Crawling {store_name} for query: '{search_query}' ({i+1}/{total_queries})")
                     
-                    # Call the crawler (Lidl only for now)
+                    # Update progress
+                    if crawl_id:
+                        progress = 10.0 + (i / total_queries) * 50.0  # 10-60% for crawling
+                        crawl_status_service.update_crawl_progress(
+                            crawl_id,
+                            current_step=f"Crawling query '{search_query}' ({i+1}/{total_queries})",
+                            progress_percentage=progress
+                        )
+                    
+                    # Call the appropriate crawler
                     if store_name == "Lidl":
                         products = await crawler.search_products(
                             query=search_query, 
-                            max_results=100, 
+                            max_results=settings.lidl_max_products_per_crawl, 
                             postal_code=postal_code
+                        )
+                    elif store_name == "Aldi":
+                        products = await crawler.search_products(
+                            query=search_query, 
+                            max_results=settings.aldi_max_products_per_crawl
                         )
                     else:
                         logger.error(f"Unknown crawler implementation for {store_name}")
@@ -71,12 +125,35 @@ class CrawlerService:
                     if products:
                         all_products.extend(products)
                         logger.info(f"Found {len(products)} products for query '{search_query}'")
+                        
+                        # Update products found count
+                        if crawl_id:
+                            crawl_status_service.update_crawl_progress(
+                                crawl_id,
+                                products_found=len(all_products)
+                            )
                     else:
                         logger.warning(f"No products found for query '{search_query}'")
                         
                 except Exception as e:
                     logger.error(f"Error crawling {store_name} for query '{search_query}': {str(e)}")
                     error_count += 1
+                    
+                    # Update error count
+                    if crawl_id:
+                        crawl_status_service.update_crawl_progress(
+                            crawl_id,
+                            errors_count=error_count
+                        )
+            
+            # Update progress for processing
+            if crawl_id:
+                crawl_status_service.update_crawl_progress(
+                    crawl_id,
+                    status=CrawlStatus.PROCESSING,
+                    current_step="Processing and deduplicating products",
+                    progress_percentage=60.0
+                )
             
             # Remove duplicates based on name and store
             unique_products = self._deduplicate_products(all_products)
@@ -84,6 +161,14 @@ class CrawlerService:
             
             # Convert to database format and save
             if unique_products:
+                # Update progress for database operations
+                if crawl_id:
+                    crawl_status_service.update_crawl_progress(
+                        crawl_id,
+                        current_step="Cleaning old products",
+                        progress_percentage=70.0
+                    )
+                
                 # Soft delete old products for this store (older than 7 days)
                 cutoff_date = datetime.utcnow() - timedelta(days=7)
                 deleted_count = await self.db_service.products.soft_delete_old_products(
@@ -92,9 +177,19 @@ class CrawlerService:
                 )
                 logger.info(f"Soft deleted {deleted_count} old products for {store_name}")
                 
+                # Update progress for product conversion
+                if crawl_id:
+                    crawl_status_service.update_crawl_progress(
+                        crawl_id,
+                        current_step="Converting products to database format",
+                        progress_percentage=80.0
+                    )
+                
                 # Prepare products for database
                 product_data_list = []
-                for product in unique_products:
+                total_products = len(unique_products)
+                
+                for idx, product in enumerate(unique_products):
                     try:
                         product_data = self._convert_product_to_db_format(
                             product, 
@@ -103,12 +198,37 @@ class CrawlerService:
                         )
                         product_data_list.append(product_data)
                         success_count += 1
+                        
+                        # Update progress periodically during conversion
+                        if crawl_id and idx % 20 == 0:  # Update every 20 products
+                            conversion_progress = 80.0 + (idx / total_products) * 15.0  # 80-95%
+                            crawl_status_service.update_crawl_progress(
+                                crawl_id,
+                                current_step=f"Converting products ({idx+1}/{total_products})",
+                                progress_percentage=conversion_progress,
+                                products_processed=len(product_data_list)
+                            )
+                            
                     except Exception as e:
                         logger.error(f"Error converting product to DB format: {str(e)}")
                         error_count += 1
+                        
+                        # Update error count
+                        if crawl_id:
+                            crawl_status_service.update_crawl_progress(
+                                crawl_id,
+                                errors_count=error_count
+                            )
                 
-                # Bulk insert products
+                # Final database save
                 if product_data_list:
+                    if crawl_id:
+                        crawl_status_service.update_crawl_progress(
+                            crawl_id,
+                            current_step="Saving products to database",
+                            progress_percentage=95.0
+                        )
+                    
                     inserted_count = await self.db_service.products.bulk_create(
                         product_data_list, 
                         crawl_session_id
@@ -116,14 +236,32 @@ class CrawlerService:
                     logger.info(f"Inserted {inserted_count} products into database")
                 
                 await self.db_service.commit()
+                
+                # Final progress update
+                if crawl_id:
+                    crawl_status_service.update_crawl_progress(
+                        crawl_id,
+                        current_step="Crawl completed successfully",
+                        progress_percentage=100.0,
+                        products_processed=success_count
+                    )
             
         except Exception as e:
             logger.error(f"Error in crawl_store for {store_name}: {str(e)}")
             await self.db_service.rollback()
+            
+            # Update error status
+            if crawl_id:
+                crawl_status_service.update_crawl_progress(
+                    crawl_id,
+                    current_step=f"Error: {str(e)}",
+                    errors_count=error_count + 1
+                )
+            
             raise
         
         logger.info(
-            f"Crawl completed for {store_name}: "
+            f"Enhanced crawl completed for {store_name}: "
             f"{success_count} products processed, {error_count} errors"
         )
         

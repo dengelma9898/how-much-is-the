@@ -54,6 +54,37 @@ class Settings(BaseSettings):
     # Cache Settings
     cache_ttl_hours: int = 24
     
+    # Rate Limiting Settings
+    manual_crawl_rate_limit_minutes: int = 5
+    crawl_timeout_minutes: int = 30
+
+    # Enhanced Monitoring Settings
+    crawl_status_history_limit: int = 50
+    crawl_status_cleanup_hours: int = 24
+    enable_detailed_crawl_logging: bool = True
+    enable_progress_tracking: bool = True
+
+    # Store-specific Settings
+    lidl_crawler_enabled: bool = True
+    lidl_base_url: str = "https://www.lidl.de"
+    lidl_max_products_per_crawl: int = 120
+    lidl_timeout_seconds: int = 60
+
+    aldi_crawler_enabled: bool = True
+    aldi_base_url: str = "https://www.aldi-sued.de"
+    aldi_max_products_per_crawl: int = 100
+
+    # Firecrawl Settings (for Aldi)
+    firecrawl_enabled: bool = False
+    firecrawl_api_key: Optional[str] = None
+    firecrawl_max_age: int = 3600000  # 1 hour cache
+    firecrawl_max_results_per_store: int = 15
+
+    # Admin Interface Settings
+    admin_dashboard_enabled: bool = True
+    admin_auto_refresh_interval: int = 5  # seconds
+    admin_max_log_entries: int = 100
+
     class Config:
         env_file = ".env"
         case_sensitive = False
