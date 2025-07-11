@@ -113,6 +113,12 @@ The first time you trigger a crawl for a store (e.g., "Lidl" or "Aldi"), the sto
 
 **Note:** Stores are created dynamically when first crawled, ensuring only stores with actual products exist in the database.
 
+**Important:** The `enabled` field controls whether a store can be crawled:
+- Enabled stores (`enabled=true`) will be included in crawl operations
+- Disabled stores (`enabled=false`) will be skipped during crawling
+- Single store crawls will be rejected if the target store is disabled
+- "Crawl all" operations will automatically skip disabled stores
+
 #### Products Table
 - `id`: Primary key
 - `name`: Product name

@@ -234,6 +234,11 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
                 
                 # Get or create store dynamically 
                 store = await crawler_service._ensure_store_exists(store_name)
+                
+                # Check if store is enabled
+                if not store.enabled:
+                    raise ValueError(f"Store '{store_name}' is disabled and cannot be crawled")
+                
                 stores = [store]
             else:
                 # Crawl all available stores (using crawler service knowledge)
@@ -241,7 +246,13 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
                 for available_store_name in crawler_service.crawlers.keys():
                     try:
                         store = await crawler_service._ensure_store_exists(available_store_name)
-                        stores.append(store)
+                        
+                        # Only add enabled stores to crawl list
+                        if store.enabled:
+                            stores.append(store)
+                        else:
+                            logger.info(f"Skipping disabled store: {available_store_name}")
+                            
                     except Exception as e:
                         logger.warning(f"Could not prepare store {available_store_name}: {e}")
                         continue
