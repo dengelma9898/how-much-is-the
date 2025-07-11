@@ -2,6 +2,11 @@
 """
 Test für die neue Verfügbarkeits- und Datums-Parsing-Logik des Lidl Crawlers
 Testet verschiedene Availability-Text-Formate und die Extraktion von Enddaten
+
+WICHTIGER HINWEIS:
+Der LidlUltimateCrawler verwendet crawl_all_products() ohne Query-Parameter.
+Der Test für echte Lidl-Suche zeigt das allgemeine Crawling-Verhalten.
+Für spezifische Produktsuchen verwenden Sie den SearchService.
 """
 
 import asyncio
@@ -99,7 +104,7 @@ async def test_real_lidl_search():
     crawler = LidlUltimateCrawler()
     
     try:
-        # Suche nach einem häufigen Produkt
+        # Da crawl_all_products keine Query akzeptiert, führen wir einen allgemeinen Crawl durch
         results = await crawler.crawl_all_products(max_results=5)
         
         print(f"Gefundene Produkte: {len(results)}")

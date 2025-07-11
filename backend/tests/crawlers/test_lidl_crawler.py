@@ -2,6 +2,16 @@
 """
 Test-Script für den LIDL Ultimate Crawler (Playwright)
 Testet den bereinigten Ultimate Crawler ohne Legacy-Fallbacks
+
+WICHTIGER HINWEIS:
+Der LidlUltimateCrawler wurde so konzipiert, dass er ALLE verfügbaren Produkte crawlt.
+Er akzeptiert keine spezifischen Query-Parameter in crawl_all_products().
+Für spezifische Produktsuchen verwenden Sie den SearchService, der in der Datenbank sucht.
+
+TESTS:
+1. test_ultimate_crawler() - Testet das allgemeine Crawling mit verschiedenen Produktmengen
+2. test_comprehensive_search() - Führt einen umfassenden Crawl durch
+3. test_search_service_queries() - Zeigt spezifische Produktsuchen über SearchService
 """
 
 import asyncio
@@ -13,6 +23,8 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
 from app.services.lidl_crawler_ultimate import LidlUltimateCrawler
+from app.services.search_service import SearchService
+from app.models.search import SearchRequest
 from app.core.config import settings
 
 # Logging konfigurieren
@@ -38,22 +50,20 @@ async def test_ultimate_crawler():
     print(f"   - Timeout: {settings.lidl_timeout}s")
     print()
     
-    # Test-Queries
-    test_queries = [
-        "milch",
-        "brot", 
-        "produkte",  # Allgemeine Suche
-        "obst",
-        "gemüse"
+    # Da crawl_all_products keine Query akzeptiert, führen wir verschiedene Tests durch
+    test_scenarios = [
+        {"name": "Kleiner Test", "max_results": 5, "description": "Schneller Test mit wenigen Produkten"},
+        {"name": "Mittlerer Test", "max_results": 15, "description": "Mittlerer Test für bessere Abdeckung"},
+        {"name": "Großer Test", "max_results": 30, "description": "Umfassender Test für vollständige Produktpalette"}
     ]
     
-    for query in test_queries:
-        print(f"🔍 Teste Ultimate Crawler Suche nach: '{query}'")
+    for scenario in test_scenarios:
+        print(f"🔍 {scenario['name']}: {scenario['description']}")
         print("-" * 40)
         
         try:
-            # Suche ausführen
-            results = await crawler.crawl_all_products(max_results=10)
+            # Crawl ausführen
+            results = await crawler.crawl_all_products(max_results=scenario['max_results'])
             
             if results:
                 print(f"✅ {len(results)} Produkte gefunden:")
@@ -84,11 +94,11 @@ async def test_ultimate_crawler():
                     print(f"     ... und {len(results) - 5} weitere Produkte")
                     
             else:
-                print(f"ℹ️  Keine Produkte für '{query}' gefunden")
+                print(f"ℹ️  Keine Produkte gefunden")
                 
         except Exception as e:
-            print(f"❌ Fehler bei Suche nach '{query}': {e}")
-            logger.exception(f"Detaillierter Fehler für '{query}':")
+            print(f"❌ Fehler bei {scenario['name']}: {e}")
+            logger.exception(f"Detaillierter Fehler für {scenario['name']}:")
         
         print()
     
@@ -102,7 +112,7 @@ async def test_comprehensive_search():
     crawler = LidlUltimateCrawler()
     
     try:
-        # Suche nach "produkte" um alle Produkte zu finden
+        # Da crawl_all_products keine Query akzeptiert, laden wir alle verfügbaren Produkte
         print("🔍 Lade alle verfügbaren LIDL-Produkte...")
         results = await crawler.crawl_all_products(max_results=120)
         
@@ -153,6 +163,69 @@ async def test_comprehensive_search():
         print(f"❌ Fehler bei umfassender Suche: {e}")
         logger.exception("Detaillierter Fehler:")
 
+async def test_search_service_queries():
+    """Testet spezifische Produktsuchen mit dem SearchService (Datenbanksuche)"""
+    print("🔍 SearchService Test (Spezifische Produktsuchen)")
+    print("=" * 60)
+    
+    search_service = SearchService()
+    
+    # Test-Queries für spezifische Produktsuchen
+    test_queries = [
+        "milch",
+        "brot", 
+        "käse",
+        "apfel",
+        "fleisch"
+    ]
+    
+    for query in test_queries:
+        print(f"🔍 Suche nach: '{query}'")
+        print("-" * 40)
+        
+        try:
+            search_request = SearchRequest(
+                query=query,
+                postal_code="10115",
+                stores=["Lidl"]  # Nur Lidl-Produkte
+            )
+            
+            # Führe Datenbanksuche durch
+            response = await search_service.search_products(search_request)
+            
+            if response.results:
+                print(f"✅ {len(response.results)} Produkte in Datenbank gefunden:")
+                
+                for i, product in enumerate(response.results[:5], 1):
+                    print(f"  {i}. {product.name}")
+                    print(f"     Preis: €{product.price}")
+                    print(f"     Store: {product.store}")
+                    if product.unit:
+                        print(f"     Einheit: {product.unit}")
+                    if product.category:
+                        print(f"     Kategorie: {product.category}")
+                    print()
+                
+                if len(response.results) > 5:
+                    print(f"     ... und {len(response.results) - 5} weitere Produkte")
+                    
+                print(f"📊 Suchzeit: {response.search_time_ms}ms")
+                print(f"📊 Quelle: {response.source}")
+                    
+            else:
+                print(f"ℹ️  Keine Produkte für '{query}' in Datenbank gefunden")
+                print("   💡 Hinweis: Eventuell müssen erst Produkte gecrawlt werden")
+                
+        except Exception as e:
+            print(f"❌ Fehler bei Suche nach '{query}': {e}")
+            logger.exception(f"Detaillierter Fehler für '{query}':")
+        
+        print()
+    
+    print("✅ SearchService Test abgeschlossen!")
+    print("💡 Für spezifische Produktsuchen verwenden Sie den SearchService")
+    print("💡 Für vollständiges Crawling verwenden Sie crawl_all_products")
+
 if __name__ == "__main__":
     print("🚀 Starte LIDL Ultimate Crawler Tests...")
     print(f"Python: {sys.version}")
@@ -167,6 +240,9 @@ if __name__ == "__main__":
         
         # Test 2: Umfassende Suche
         asyncio.run(test_comprehensive_search())
+        
+        # Test 3: SearchService-Tests
+        asyncio.run(test_search_service_queries())
         
     except KeyboardInterrupt:
         print("\n⚠️  Test durch Benutzer abgebrochen")
