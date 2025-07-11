@@ -26,6 +26,8 @@ from app.services.lidl_crawler_ultimate import LidlUltimateCrawler
 from app.services.search_service import SearchService
 from app.models.search import SearchRequest
 from app.core.config import settings
+from app.models.search import SearchRequest
+from app.services.search_service import search_service
 
 # Logging konfigurieren
 logging.basicConfig(
@@ -34,10 +36,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-async def test_ultimate_crawler():
-    """Testet den LIDL Ultimate Crawler (Playwright)"""
+async def test_crawler_data_collection():
+    """Testet die Datensammlung des LIDL Ultimate Crawlers (Playwright)"""
     
-    print("🚀 LIDL Ultimate Crawler Test (Playwright)")
+    print("🚀 LIDL Ultimate Crawler Test (Playwright) - Datensammlung")
     print("=" * 60)
     
     # Ultimate Crawler erstellen
@@ -78,8 +80,9 @@ async def test_ultimate_crawler():
                 
                 print(f"📊 Kategorien: {list(categories.keys())}")
                 
-                # Zeige erste 5 Produkte
-                for i, product in enumerate(results[:5], 1):
+                # Zeige erste 5 Produkte pro Szenario
+                display_count = min(5, len(results))
+                for i, product in enumerate(results[:display_count], 1):
                     print(f"  {i}. {product.name}")
                     print(f"     Preis: €{product.price}")
                     if product.unit:
@@ -90,8 +93,8 @@ async def test_ultimate_crawler():
                         print(f"     Beschreibung: {product.description}")
                     print()
                 
-                if len(results) > 5:
-                    print(f"     ... und {len(results) - 5} weitere Produkte")
+                if len(results) > display_count:
+                    print(f"     ... und {len(results) - display_count} weitere Produkte")
                     
             else:
                 print(f"ℹ️  Keine Produkte gefunden")
@@ -101,8 +104,73 @@ async def test_ultimate_crawler():
             logger.exception(f"Detaillierter Fehler für {scenario['name']}:")
         
         print()
+
+async def test_search_functionality():
+    """Testet die Suchfunktionalität mit verschiedenen Queries"""
     
-    print("✅ Ultimate Crawler Test abgeschlossen!")
+    print("\n🔍 LIDL Suchfunktionalität Test")
+    print("=" * 60)
+    
+    # Test-Queries
+    test_queries = [
+        "milch",
+        "brot", 
+        "produkte",  # Allgemeine Suche
+        "obst",
+        "gemüse"
+    ]
+    
+    for query in test_queries:
+        print(f"🔍 Teste Suchquery: '{query}'")
+        print("-" * 40)
+        
+        try:
+            # SearchRequest erstellen
+            search_request = SearchRequest(
+                query=query,
+                postal_code="10115",
+                stores=["lidl"]  # Nur LIDL-Produkte
+            )
+            
+            # Suche ausführen
+            response = await search_service.search_products(search_request)
+            
+            if response.results:
+                print(f"✅ {len(response.results)} Produkte in Datenbank gefunden:")
+                print(f"⏱️  Suchzeit: {response.search_time_ms}ms")
+                
+                # Gruppiere nach Kategorien
+                categories = {}
+                for product in response.results:
+                    cat = product.category or "Sonstiges"
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(product)
+                
+                if categories:
+                    print(f"📊 Kategorien: {list(categories.keys())}")
+                
+                # Zeige erste 3 Produkte
+                for i, product in enumerate(response.results[:3], 1):
+                    print(f"  {i}. {product.name}")
+                    print(f"     Preis: €{product.price}")
+                    if product.unit:
+                        print(f"     Einheit: {product.unit}")
+                    if product.category:
+                        print(f"     Kategorie: {product.category}")
+                    print()
+                
+                if len(response.results) > 3:
+                    print(f"     ... und {len(response.results) - 3} weitere Produkte")
+                    
+            else:
+                print(f"ℹ️  Keine Produkte für '{query}' in der Datenbank gefunden")
+                
+        except Exception as e:
+            print(f"❌ Fehler bei Query '{query}': {e}")
+            logger.exception(f"Detaillierter Fehler:")
+        
+        print()
 
 async def test_comprehensive_search():
     """Führt eine umfassende Suche durch um die Leistung zu testen"""
@@ -232,14 +300,26 @@ if __name__ == "__main__":
     print(f"Arbeitsverzeichnis: {os.getcwd()}")
     print()
     
-    # Führe Tests aus
-    try:
-        # Test 1: Grundfunktionalität
-        asyncio.run(test_ultimate_crawler())
+    async def main():
+        # Test 1: Datensammlung
+        crawled_products = await test_crawler_data_collection()
         print()
         
-        # Test 2: Umfassende Suche
-        asyncio.run(test_comprehensive_search())
+        # Test 2: Suchfunktionalität (nur wenn Daten vorhanden)
+        if crawled_products:
+            await test_search_functionality()
+            print()
+        else:
+            print("⚠️  Überspringe Suchtest - keine gecrawlten Daten vorhanden")
+        
+        # Test 3: Umfassende Suche
+        await test_comprehensive_search()
+        
+        print("✅ Alle Tests abgeschlossen!")
+    
+    # Führe Tests aus
+    try:
+        asyncio.run(main())
         
         # Test 3: SearchService-Tests
         asyncio.run(test_search_service_queries())

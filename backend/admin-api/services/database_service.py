@@ -36,12 +36,13 @@ class StoreRepository:
         )
         return result.scalar_one_or_none()
     
-    async def create(self, name: str, logo_url: str = None, base_url: str = None) -> DatabaseStore:
+    async def create(self, name: str, logo_url: str = None, base_url: str = None, enabled: bool = True) -> DatabaseStore:
         """Create a new store"""
         store = DatabaseStore(
             name=name,
             logo_url=logo_url,
-            base_url=base_url
+            base_url=base_url,
+            enabled=enabled
         )
         self.session.add(store)
         await self.session.flush()

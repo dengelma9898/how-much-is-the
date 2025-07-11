@@ -10,6 +10,7 @@ The application now supports:
 - Database-first search with live crawling fallback
 - Admin endpoints for manual operations
 - Proper data lifecycle management
+- **Dynamic store creation** - stores are created only when crawled
 
 ## Prerequisites
 
@@ -87,20 +88,16 @@ cd backend
 python3 -m alembic upgrade head
 ```
 
-### 5. Initialize Default Data
+### 5. Dynamic Store Creation
 
-Start the application to initialize default stores:
+**NEW:** Stores are now created automatically when you first crawl them! No manual initialization needed.
 
 ```bash
 cd backend
 python3 -m uvicorn app.main:app --reload --port 8000
 ```
 
-Or manually initialize via API:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/admin/stores/initialize
-```
+The first time you trigger a crawl for a store (e.g., "Lidl" or "Aldi"), the store will be automatically created in the database.
 
 ## Architecture Overview
 
@@ -108,11 +105,19 @@ curl -X POST http://localhost:8000/api/v1/admin/stores/initialize
 
 #### Stores Table
 - `id`: Primary key
-- `name`: Store name (Lidl, and others when implemented)
+- `name`: Store name (e.g., "Lidl", "Aldi")
 - `logo_url`: Store logo URL
 - `base_url`: Store website URL
-- `enabled`: Whether store is active
+- `enabled`: Whether store is active (default: true)
 - Timestamps: `created_at`, `updated_at`
+
+**Note:** Stores are created dynamically when first crawled, ensuring only stores with actual products exist in the database.
+
+**Important:** The `enabled` field controls whether a store can be crawled:
+- Enabled stores (`enabled=true`) will be included in crawl operations
+- Disabled stores (`enabled=false`) will be skipped during crawling
+- Single store crawls will be rejected if the target store is disabled
+- "Crawl all" operations will automatically skip disabled stores
 
 #### Products Table
 - `id`: Primary key
@@ -146,7 +151,8 @@ curl -X POST http://localhost:8000/api/v1/admin/stores/initialize
 - Transaction management
 
 #### CrawlerService  
-- Coordinates existing Lidl crawler (Aldi temporarily disabled)
+- Coordinates existing crawlers (Lidl Ultimate, Aldi Ultimate)
+- **Dynamic store creation** - creates stores on first crawl
 - Converts crawler results to database format
 - Handles deduplication and categorization
 - Manages data lifecycle (soft delete old products)
@@ -159,200 +165,59 @@ curl -X POST http://localhost:8000/api/v1/admin/stores/initialize
 
 ## API Endpoints
 
+### Store Management
+
+#### Get All Stores
+```
+GET /api/v1/admin/stores
+```
+Returns all stores in the database (created through crawling).
+
+#### Initialize Stores (DEPRECATED)
+```
+POST /api/v1/admin/stores/initialize
+```
+**DEPRECATED:** Returns info that stores are now created dynamically.
+
+### Crawling Endpoints
+
+#### Trigger Manual Crawl
+```
+POST /api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
+```
+Triggers crawling for a specific store. If the store doesn't exist in the database, it will be created automatically.
+
+```
+POST /api/v1/admin/crawl/trigger?postal_code=10115
+```
+Triggers crawling for all available stores (based on available crawlers).
+
 ### Search Endpoints
 
 #### Primary Search (with database support)
 ```
-POST /api/v1/search
-{
-  "query": "Milch",
-  "postal_code": "10115"
-}
-
-Query Parameters:
-- use_database=true: Use database search first
-- fallback_to_live=true: Fallback to live crawling if no DB results
+GET /api/v1/search/products?query=milch&postal_code=10115&stores=Lidl,Aldi&max_price=2.50&limit=20
 ```
 
-#### Database-only Search
-```
-GET /api/v1/search/database?query=Milch&postal_code=10115
-```
+### Dynamic Store Creation Benefits
 
-### Admin Endpoints
+1. **Only stores with products** - No empty stores in the database
+2. **Automatic management** - No manual initialization required
+3. **Clean database** - Only contains stores that are actually crawled
+4. **Scalable** - Easy to add new stores by just adding crawlers
+5. **Self-maintaining** - Stores are created when needed
 
-#### Scheduler Management
-```
-GET /api/v1/admin/scheduler/status
-POST /api/v1/admin/scheduler/start
-POST /api/v1/admin/scheduler/stop
-```
+### Migration from Static Store Initialization
 
-#### Manual Operations
-```
-POST /api/v1/admin/crawl/trigger?store_name=Lidl&postal_code=10115
-POST /api/v1/admin/crawl/cleanup
-```
+If you have existing stores from manual initialization, they will continue to work normally. The new system is backward compatible but prevents creation of unused stores.
 
-#### Statistics and Monitoring
-```
-GET /api/v1/admin/crawl/statistics?days=7
-GET /api/v1/admin/database/stats
-GET /api/v1/admin/stores
-```
-
-## Usage Scenarios
-
-### 1. Development Without Database
-
-The application gracefully handles missing database connections:
-- Database operations are commented out in startup
-- Search falls back to live crawling
-- Admin endpoints return appropriate errors
-
-### 2. Production with Database
-
-1. **Initial Setup**: Run migrations, initialize stores
-2. **First Crawl**: Trigger manual crawl to populate data
-3. **Automated Operation**: Weekly scheduler maintains fresh data
-4. **Search**: Fast database searches with live fallback
-
-### 3. Hybrid Mode
-
-- Use database for common queries (fast response)
-- Use live crawling for specific/rare queries
-- Gradually populate database with more comprehensive data
-
-## Monitoring and Maintenance
-
-### Health Checks
-
-```bash
-# Application health
-curl http://localhost:8000/api/v1/health
-
-# Admin health with system status  
-curl http://localhost:8000/api/v1/admin/health
-
-# Search functionality health
-curl http://localhost:8000/api/v1/health/search
-```
-
-### Database Maintenance
-
-#### View Recent Crawl Sessions
+To clean up manually created unused stores:
 ```sql
-SELECT s.name, cs.status, cs.started_at, cs.success_count, cs.error_count
-FROM crawl_sessions cs 
-JOIN stores s ON cs.store_id = s.id 
-ORDER BY cs.started_at DESC LIMIT 10;
-```
+-- Find stores with no products
+SELECT s.id, s.name FROM stores s 
+LEFT JOIN products p ON s.id = p.store_id 
+WHERE p.id IS NULL;
 
-#### Product Statistics
-```sql
-SELECT s.name, COUNT(*) as products, AVG(p.price) as avg_price
-FROM products p 
-JOIN stores s ON p.store_id = s.id 
-WHERE p.deleted_at IS NULL 
-GROUP BY s.name;
-```
-
-#### Cleanup Old Products
-```bash
-curl -X DELETE http://localhost:8000/api/v1/admin/products/cleanup/30
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Failed**
-   - Check PostgreSQL is running
-   - Verify connection string in `.env`
-   - Check user permissions
-
-2. **Migration Errors**
-   - Ensure database exists and user has privileges
-   - Check Alembic configuration
-   - Try `alembic revision --autogenerate` for schema drift
-
-3. **Scheduler Not Working**
-   - Check `ENABLE_SCHEDULER=true` in config
-   - Verify timezone settings
-   - Check logs for APScheduler errors
-
-4. **No Products Found**
-   - Run manual crawl first: `POST /api/v1/admin/crawl/trigger`
-   - Check crawler services are working
-   - Verify store initialization
-
-### Logs and Debugging
-
-The application uses structured logging:
-- INFO level for normal operations
-- ERROR level for failures
-- Crawler progress and statistics logged
-
-Enable database query logging:
-```env
-DATABASE_ECHO=true
-```
-
-## Performance Considerations
-
-### Database Optimization
-
-1. **Indexes**: Pre-configured indexes on commonly searched fields
-2. **Soft Deletes**: Old products marked as deleted, not removed immediately
-3. **Pagination**: Search results properly paginated
-4. **Connection Pooling**: Async connection pooling configured
-
-### Caching Strategy
-
-Future enhancements could include:
-- Redis caching for frequent searches  
-- CDN for product images
-- Search result caching
-
-### Scaling Considerations
-
-- Database: Consider read replicas for heavy search loads
-- Crawling: Implement distributed crawling for more stores
-- API: Load balancing and rate limiting
-
-## Migration from Live-Only System
-
-### Gradual Migration
-
-1. **Phase 1**: Deploy with database disabled, test compatibility
-2. **Phase 2**: Enable database, run alongside live crawling
-3. **Phase 3**: Prefer database results, fallback to live
-4. **Phase 4**: Full database-first operation
-
-### Data Migration
-
-For existing installations:
-1. Deploy new code with database integration
-2. Run initial comprehensive crawl
-3. Verify data quality and coverage
-4. Switch to database-first mode
-
-## Future Enhancements
-
-### Planned Features
-
-1. **Full-Text Search**: PostgreSQL full-text search capabilities
-2. **Price History**: Track price changes over time
-3. **Alert System**: Price drop notifications
-4. **Analytics**: Search patterns and popular products
-5. **API Rate Limiting**: Protect against abuse
-6. **Multi-Region**: Support for different geographical regions
-
-### Advanced Monitoring
-
-1. **Metrics**: Prometheus/Grafana integration
-2. **Alerting**: Failed crawl notifications
-3. **Performance**: Query optimization and monitoring
-4. **Costs**: Track crawling costs and API usage
-
-This database integration provides a solid foundation for scaling the price comparison service while maintaining the flexibility of the original live crawling approach. 
+-- Remove if desired (CAUTION: This permanently deletes stores)
+-- DELETE FROM stores WHERE id IN (...);
+``` 

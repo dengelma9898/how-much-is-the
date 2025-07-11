@@ -17,22 +17,24 @@ from pprint import pprint
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
 from app.services.lidl_crawler_bs4 import create_intelligent_lidl_crawler
+from app.models.search import SearchRequest
+from app.services.search_service import search_service
 
 # Logging konfigurieren
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def test_intelligent_lidl_crawler():
-    """Testet den intelligenten Lidl-Crawler"""
+async def test_crawler_data_collection():
+    """Testet die Datensammlung des intelligenten Lidl-Crawlers"""
     try:
-        logger.info("🧠 Starte Test für intelligenten Lidl-Crawler...")
+        logger.info("🧠 Starte Datensammlung mit intelligentem Lidl-Crawler...")
         
         # Intelligenten Lidl-Crawler erstellen
         crawler = create_intelligent_lidl_crawler()
         
         if not crawler:
             logger.error("❌ Intelligenter Lidl-Crawler konnte nicht initialisiert werden")
-            return
+            return []
         
         logger.info("✅ Intelligenter Lidl-Crawler erfolgreich initialisiert")
         
@@ -86,10 +88,58 @@ async def test_intelligent_lidl_crawler():
             except Exception as e:
                 logger.error(f"❌ Fehler beim Crawling: {e}")
         
-        logger.info("🎉 Intelligenter Lidl-Crawler Test abgeschlossen!")
+        return results
+                
+    except Exception as e:
+        logger.error(f"❌ Fehler beim Crawling: {e}")
+        return []
+
+async def test_search_functionality():
+    """Testet die Suchfunktionalität mit verschiedenen Queries"""
+    try:
+        logger.info("\n🔍 Teste Suchfunktionalität mit verschiedenen Queries...")
+        
+        # Test-Queries
+        test_queries = [
+            "milch",
+            "brot", 
+            "käse",
+            "apfel",
+            "fleisch"
+        ]
+        
+        for query in test_queries:
+            logger.info(f"\n🔍 Teste Query: '{query}'")
+            try:
+                # SearchRequest erstellen
+                search_request = SearchRequest(
+                    query=query,
+                    postal_code="10115",
+                    stores=["lidl"]  # Nur LIDL-Produkte
+                )
+                
+                # Suche ausführen
+                response = await search_service.search_products(search_request)
+                
+                if response.results:
+                    logger.info(f"🎯 Gefunden: {len(response.results)} Produkte für '{query}'")
+                    for i, product in enumerate(response.results[:3], 1):  # Zeige nur die ersten 3
+                        logger.info(f"  {i}. {product.name} - €{product.price} ({product.store})")
+                        if product.unit:
+                            logger.info(f"     Einheit: {product.unit}")
+                        if product.brand:
+                            logger.info(f"     Marke: {product.brand}")
+                else:
+                    logger.info(f"📊 Keine Produkte für '{query}' in der Datenbank gefunden")
+                    
+            except Exception as e:
+                logger.error(f"❌ Fehler bei Query '{query}': {e}")
+            
+            # Kurze Pause zwischen Requests
+            await asyncio.sleep(0.5)
         
     except Exception as e:
-        logger.error(f"❌ Fehler beim Test: {e}", exc_info=True)
+        logger.error(f"❌ Fehler beim Testen der Suchfunktionalität: {e}")
 
 async def test_raw_extraction():
     """Testet nur die rohe HTML-Extraktion ohne LLM"""
@@ -123,10 +173,21 @@ async def test_raw_extraction():
         logger.error(f"❌ Fehler bei roher Extraktion: {e}", exc_info=True)
 
 if __name__ == "__main__":
-    # Teste zuerst rohe Extraktion
-    asyncio.run(test_raw_extraction())
+    async def main():
+        # Teste zuerst rohe Extraktion
+        await test_raw_extraction()
+        
+        print("\n" + "="*50 + "\n")
+        
+        # Dann sammle Daten mit dem Crawler
+        crawled_products = await test_crawler_data_collection()
+        
+        print("\n" + "="*50 + "\n")
+        
+        # Teste Suchfunktionalität (funktioniert nur wenn Daten in DB sind)
+        await test_search_functionality()
+        
+        logger.info("🎉 Alle Tests abgeschlossen!")
     
-    print("\n" + "="*50 + "\n")
-    
-    # Dann vollständigen intelligenten Test
-    asyncio.run(test_intelligent_lidl_crawler()) 
+    # Führe Tests aus
+    asyncio.run(main()) 
