@@ -43,6 +43,7 @@ class CrawlerService:
         """
         Ensures the store exists in the database, creating it if necessary.
         Only creates stores that we actually crawl.
+        Handles race conditions by retrying store lookup if creation fails due to unique constraint.
         
         Args:
             store_name: Name of the store to ensure exists
@@ -70,13 +71,29 @@ class CrawlerService:
         metadata = self.store_metadata[store_name]
         logger.info(f"🏪 Creating new store '{store_name}' in database (first crawl)")
         
-        # Create store in database
-        store = await self.db_service.stores.create(
-            name=metadata["name"],
-            base_url=metadata["base_url"],
-            logo_url=metadata["logo_url"]
-        )
-        logger.info(f"✅ Store '{store_name}' successfully created with ID {store.id}")
+        try:
+            # Create store in database with all metadata including enabled status
+            store = await self.db_service.stores.create(
+                name=metadata["name"],
+                base_url=metadata["base_url"],
+                logo_url=metadata["logo_url"],
+                enabled=metadata["enabled"]
+            )
+            logger.info(f"✅ Store '{store_name}' successfully created with ID {store.id}")
+            
+        except Exception as e:
+            # Handle race condition: if another process created the store concurrently,
+            # we get a unique constraint violation. In this case, try to fetch the store again.
+            logger.info(f"Store creation failed (likely race condition): {str(e)}")
+            logger.info(f"Retrying store lookup for '{store_name}'")
+            
+            store = await self.db_service.stores.get_by_name(store_name)
+            if store:
+                logger.info(f"✅ Store '{store_name}' found after retry (created by concurrent process)")
+            else:
+                # If we still can't find it, re-raise the original error
+                logger.error(f"Failed to create or find store '{store_name}' after retry")
+                raise
         
         return store
     
