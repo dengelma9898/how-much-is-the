@@ -268,14 +268,7 @@ class LidlUltimateCrawler:
         
         return products
 
-    # Legacy-Methode für Rückwärtskompatibilität (wird durch crawl_all_products ersetzt)
-    async def search_products(self, query: str = "", max_results: int = 100, postal_code: str = "10115") -> List[ProductResult]:
-        """
-        DEPRECATED: Legacy-Methode für Kompatibilität
-        Nutze crawl_all_products() für das neue kategorien-basierte System
-        """
-        logger.warning("⚠️  search_products() ist deprecated. Nutze crawl_all_products() für bessere Ergebnisse.")
-        return await self.crawl_all_products(max_results, postal_code)
+
     
     async def _handle_cookie_banner(self, page: Page) -> bool:
         """Behandelt Cookie-Banner intelligent"""

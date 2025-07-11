@@ -53,7 +53,7 @@ async def test_ultimate_crawler():
         
         try:
             # Suche ausführen
-            results = await crawler.search_products(query, max_results=10)
+            results = await crawler.crawl_all_products(max_results=10)
             
             if results:
                 print(f"✅ {len(results)} Produkte gefunden:")
@@ -104,7 +104,7 @@ async def test_comprehensive_search():
     try:
         # Suche nach "produkte" um alle Produkte zu finden
         print("🔍 Lade alle verfügbaren LIDL-Produkte...")
-        results = await crawler.search_products("produkte", max_results=120)
+        results = await crawler.crawl_all_products(max_results=120)
         
         if results:
             print(f"🎉 INSGESAMT {len(results)} Produkte gefunden!")

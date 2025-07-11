@@ -45,7 +45,7 @@ async def test_intelligent_lidl_crawler():
             for query in test_queries:
                 logger.info(f"\n🔍 Teste Query: '{query}'")
                 try:
-                    results = await crawler.search_products(query, max_results=5)
+                    results = await crawler.crawl_all_products(max_results=5)
                     
                     if results:
                         logger.info(f"🎯 Gefunden: {len(results)} Produkte für '{query}'")

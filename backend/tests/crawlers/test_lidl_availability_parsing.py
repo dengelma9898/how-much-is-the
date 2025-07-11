@@ -100,7 +100,7 @@ async def test_real_lidl_search():
     
     try:
         # Suche nach einem häufigen Produkt
-        results = await crawler.search_products("Milch", max_results=5)
+        results = await crawler.crawl_all_products(max_results=5)
         
         print(f"Gefundene Produkte: {len(results)}")
         print()

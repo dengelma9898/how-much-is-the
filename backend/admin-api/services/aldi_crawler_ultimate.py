@@ -1,64 +1,88 @@
 #!/usr/bin/env python3
 """
-LIDL Ultimate Crawler - Kategorien-basiert (nicht Query-basiert)
-Crawlt ALLE Produkte aus ALLEN Kategorien und speichert sie in der DB
+ALDI Ultimate Crawler - Kategorien-basiert (nicht Query-basiert)
+Crawlt ALLE Produkte aus ALLEN ALDI-Kategorien und speichert sie in der DB
+Basiert auf dem erfolgreichen LIDL-Crawler-Muster
 """
 
 import asyncio
 import logging
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from playwright.async_api import async_playwright, Page, Browser
-from app.models.search import ProductResult
+from shared.models.search import ProductResult
 
 # Logger Setup
 logger = logging.getLogger(__name__)
 
-class LidlUltimateCrawler:
-    """Ultimativer LIDL Crawler mit kategorien-basiertem Ansatz"""
+class AldiUltimateCrawler:
+    """Ultimativer ALDI Crawler mit kategorien-basiertem Ansatz"""
     
     def __init__(self):
-        self.base_url = "https://www.lidl.de"
+        self.base_url = "https://www.aldi-sued.de"
         self.timeout = 120000  # 2 Minuten für gründliches Crawling
         
-        # LIDL Billiger Montag Aktionsseite (die richtige URL!)
-        self.billiger_montag_url = "https://www.lidl.de/c/billiger-montag/a10006065?channel=store&tabCode=Current_Sales_Week"
+        # ALDI Kategorie-URLs
+        self.category_urls = {
+            "Frischekracher": "https://www.aldi-sued.de/de/angebote/frischekracher.html",
+            "Markenaktion der Woche": "https://www.aldi-sued.de/de/angebote/markenaktion-der-woche.html", 
+            "Preisaktion": "https://www.aldi-sued.de/de/angebote/preisaktion.html"
+        }
         
-        # KORREKTE CSS-Selektoren für LIDL-Produkte
+        # ALDI CSS-Selektoren (basierend auf typischen ALDI-Strukturen)
         self.product_selectors = [
-            '.product-grid-box',  # Hauptselektor für Produktkarten (direkt kompatibel mit content-selektoren)
-            '.odsc-tile__inner',  # Alternative für neuere LIDL-Struktur
-            '[class*="odsc-tile__inner"]',  # Fallback mit Teilstring-Match
-            '[data-testid*="product"]'  # Zusätzlicher Fallback
+            '.product-tile',           # Standard ALDI Produktkarte
+            '.offer-tile',             # Angebots-Karte
+            '.product-item',           # Alternative Produktitem
+            '[class*="product"]',      # Fallback für Produktklassen
+            '[class*="offer"]',        # Fallback für Angebotsklassen
+            '.mod-article-tile',       # Modular Article Tile
+            '[data-testid*="product"]' # Test-ID Fallback
         ]
         
-        # Alternative Content-Selektoren für verschiedene Container-Typen
+        # Title-Selektoren
         self.title_selectors = [
-            '.product-grid-box__title',  # Standard LIDL Produkttitel
-            '[data-testid*="title"]',    # Alternative für neue Struktur
-            'h2', 'h3', 'h4',           # Fallback Header-Selektoren
-            '.title', '.name'           # Generic Title-Selektoren
+            '.product-tile__title',
+            '.offer-tile__title', 
+            '.product-title',
+            '.article-title',
+            'h2', 'h3', 'h4',
+            '[class*="title"]',
+            '[class*="name"]'
         ]
         
+        # Preis-Selektoren
         self.price_selectors = [
-            '.ods-price__value',         # Standard LIDL Preisselektor
-            '[class*="price"]',          # Fallback für jede Preis-Klasse
-            '[data-testid*="price"]',    # Data-testid Fallback
-            '.price', '.cost'            # Generic Preis-Selektoren
+            '.product-tile__price',
+            '.offer-tile__price',
+            '.price-current',
+            '.price-value',
+            '[class*="price"]',
+            '.price',
+            '.cost'
+        ]
+        
+        # Einheit-Selektoren
+        self.unit_selectors = [
+            '.product-tile__unit',
+            '.offer-tile__unit',
+            '.price-unit',
+            '.unit-price',
+            '[class*="unit"]'
         ]
 
     async def crawl_all_products(self, max_results: int = 1000, postal_code: str = "10115") -> List[ProductResult]:
         """
-        Crawlt ALLE Produkte von der LIDL Billiger Montag Aktionsseite
+        Crawlt ALLE Produkte von allen ALDI-Kategorieseiten
         
         Args:
-            max_results: Maximum Anzahl Ergebnisse
-            postal_code: Postleitzahl (für LIDL nicht verwendet)
+            max_results: Maximum Anzahl Ergebnisse pro Kategorie
+            postal_code: Postleitzahl (für ALDI nicht verwendet)
         
         Returns:
-            Liste ALLER gefundenen Produkte von der Aktionsseite
+            Liste ALLER gefundenen Produkte von allen Kategorieseiten
         """
         all_products = []
         
@@ -79,31 +103,58 @@ class LidlUltimateCrawler:
                 )
                 await page.set_viewport_size({"width": 1920, "height": 1080})
                 
-                logger.info(f"🏪 Starte LIDL Billiger Montag Crawling")
-                logger.info(f"🌐 URL: {self.billiger_montag_url}")
+                logger.info(f"🏪 Starte ALDI Ultimate Crawling für {len(self.category_urls)} Kategorien")
                 
-                # Navigiere zur Billiger Montag Seite
-                await page.goto(self.billiger_montag_url, timeout=self.timeout)
-                await page.wait_for_load_state('domcontentloaded')
-                await page.wait_for_timeout(5000)  # 5 Sekunden für vollständiges Laden
-                
-                # Cookie-Banner behandeln
-                await self._handle_cookie_banner(page)
-                await page.wait_for_timeout(3000)
-                
-                # GRÜNDLICHES SCROLLEN in 3 Phasen
-                await self._thorough_scroll_strategy(page)
-                
-                # Produkte extrahieren
-                all_products = await self._extract_products_from_page(page, max_results)
+                # Crawle jede Kategorie
+                for category_name, category_url in self.category_urls.items():
+                    try:
+                        logger.info(f"🛍️ Crawle Kategorie: {category_name}")
+                        logger.info(f"🌐 URL: {category_url}")
+                        
+                        category_products = await self._crawl_category(page, category_name, category_url, max_results)
+                        all_products.extend(category_products)
+                        
+                        logger.info(f"✅ {category_name}: {len(category_products)} Produkte gefunden")
+                        
+                        # Kurze Pause zwischen Kategorien
+                        await asyncio.sleep(2)
+                        
+                    except Exception as e:
+                        logger.error(f"❌ Fehler bei Kategorie {category_name}: {e}")
+                        continue
                 
                 await browser.close()
                 
         except Exception as e:
-            logger.error(f"❌ LIDL Billiger Montag Crawler Fehler: {e}")
+            logger.error(f"❌ ALDI Ultimate Crawler Fehler: {e}")
             
-        logger.info(f"🎯 GESAMT: {len(all_products)} Produkte von Billiger Montag gecrawlt")
+        logger.info(f"🎯 GESAMT: {len(all_products)} Produkte von ALDI gecrawlt")
         return all_products
+    
+    async def _crawl_category(self, page: Page, category_name: str, category_url: str, max_results: int) -> List[ProductResult]:
+        """Crawlt eine einzelne ALDI-Kategorie"""
+        products = []
+        
+        try:
+            # Navigiere zur Kategorie-Seite
+            await page.goto(category_url, timeout=self.timeout)
+            await page.wait_for_load_state('domcontentloaded')
+            await page.wait_for_timeout(5000)  # 5 Sekunden für vollständiges Laden
+            
+            # Cookie-Banner behandeln
+            await self._handle_cookie_banner(page)
+            await page.wait_for_timeout(3000)
+            
+            # GRÜNDLICHES SCROLLEN in 3 Phasen
+            await self._thorough_scroll_strategy(page)
+            
+            # Produkte extrahieren
+            products = await self._extract_products_from_page(page, category_name, max_results)
+            
+        except Exception as e:
+            logger.error(f"❌ Fehler beim Crawlen der Kategorie {category_name}: {e}")
+        
+        return products
     
     async def _thorough_scroll_strategy(self, page: Page) -> None:
         """
@@ -210,8 +261,8 @@ class LidlUltimateCrawler:
                 continue
         return total_count
     
-    async def _extract_products_from_page(self, page: Page, max_results: int) -> List[ProductResult]:
-        """Extrahiert Produkte von der Billiger Montag Seite mit erweiterten Selektoren"""
+    async def _extract_products_from_page(self, page: Page, category_name: str, max_results: int) -> List[ProductResult]:
+        """Extrahiert Produkte von der ALDI-Kategorieseite mit erweiterten Selektoren"""
         products = []
         
         try:
@@ -249,8 +300,8 @@ class LidlUltimateCrawler:
                 try:
                     product = await self._extract_single_product(container, page)
                     if product:
-                        # Füge Billiger Montag Kategorie hinzu
-                        product.category = "Billiger Montag"
+                        # Füge ALDI-Kategorie hinzu
+                        product.category = category_name
                         products.append(product)
                         
                         # Logging alle 20 Produkte
@@ -267,8 +318,6 @@ class LidlUltimateCrawler:
             logger.error(f"❌ Produktextraktion Fehler: {e}")
         
         return products
-
-
     
     async def _handle_cookie_banner(self, page: Page) -> bool:
         """Behandelt Cookie-Banner intelligent"""
@@ -280,7 +329,10 @@ class LidlUltimateCrawler:
                 '[role="dialog"]',
                 '.consent-banner',
                 '[class*="cookie"]',
-                '[class*="consent"]'
+                '[class*="consent"]',
+                '.cookie-consent',
+                '#cookie-consent',
+                '.gdpr-banner'
             ]
             
             for selector in cookie_selectors:
@@ -290,17 +342,27 @@ class LidlUltimateCrawler:
                         if await dialog.is_visible():
                             dialog_text = await dialog.inner_text()
                             
-                            if any(word in dialog_text.lower() for word in ['zustimmen', 'consent', 'cookie']):
+                            if any(word in dialog_text.lower() for word in ['zustimmen', 'consent', 'cookie', 'akzeptieren']):
                                 logger.info(f"   🎯 Cookie-Dialog gefunden: {dialog_text[:50]}...")
                                 
-                                # Finde ZUSTIMMEN Button
-                                zustimmen_btn = await dialog.query_selector('button:has-text("ZUSTIMMEN")')
-                                if zustimmen_btn and await zustimmen_btn.is_visible():
-                                    logger.info("   🔘 Klicke ZUSTIMMEN...")
-                                    await zustimmen_btn.click()
-                                    await page.wait_for_timeout(2000)
-                                    logger.info("   ✅ Cookie-Banner erfolgreich geschlossen!")
-                                    return True
+                                # Finde Akzeptieren/Zustimmen Button
+                                accept_selectors = [
+                                    'button:has-text("Akzeptieren")',
+                                    'button:has-text("Zustimmen")', 
+                                    'button:has-text("Alle akzeptieren")',
+                                    'button:has-text("OK")',
+                                    '[class*="accept"]',
+                                    '[class*="consent"]'
+                                ]
+                                
+                                for accept_selector in accept_selectors:
+                                    accept_btn = await dialog.query_selector(accept_selector)
+                                    if accept_btn and await accept_btn.is_visible():
+                                        logger.info(f"   🔘 Klicke Akzeptieren-Button...")
+                                        await accept_btn.click()
+                                        await page.wait_for_timeout(2000)
+                                        logger.info("   ✅ Cookie-Banner erfolgreich geschlossen!")
+                                        return True
                 except:
                     continue
                     
@@ -311,54 +373,8 @@ class LidlUltimateCrawler:
             logger.error(f"   ❌ Cookie-Banner Fehler: {e}")
             return False
     
-    async def _progressive_scroll_to_load_all(self, page: Page) -> None:
-        """Progressives Scrollen um ALLE Produkte zu laden"""
-        try:
-            logger.info("📜 Starte progressives Scrollen...")
-            
-            previous_count = 0
-            scroll_attempts = 0
-            max_scroll_attempts = 20
-            
-            while scroll_attempts < max_scroll_attempts:
-                # Aktuelle Produktanzahl
-                current_products = await page.query_selector_all('.product-grid-box')
-                current_count = len(current_products)
-                
-                logger.info(f"   📊 Scroll {scroll_attempts + 1}: {current_count} Produkte")
-                
-                # Wenn keine neuen Produkte mehr laden, sind wir fertig
-                if current_count == previous_count and scroll_attempts > 2:
-                    logger.info(f"   ✅ Scrollen beendet - keine neuen Produkte mehr")
-                    break
-                
-                previous_count = current_count
-                
-                # Scroll-Position berechnen
-                scroll_height = await page.evaluate("document.body.scrollHeight")
-                scroll_step = scroll_height // 10  # 10% Schritte
-                
-                new_scroll_pos = (scroll_attempts + 1) * scroll_step
-                await page.evaluate(f"window.scrollTo(0, {new_scroll_pos})")
-                
-                # Warte auf Lazy Loading
-                await page.wait_for_timeout(1500)
-                
-                scroll_attempts += 1
-            
-            # Finale Scroll ganz nach unten
-            logger.info("   📜 Finale Scroll ganz nach unten...")
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(3000)
-            
-            final_products = await page.query_selector_all('.product-grid-box')
-            logger.info(f"   🎯 FINALE Produktanzahl: {len(final_products)}")
-            
-        except Exception as e:
-            logger.error(f"   ❌ Scroll-Fehler: {e}")
-    
     async def _extract_single_product(self, container, page: Page) -> Optional[ProductResult]:
-        """Extrahiert ein einzelnes Produkt aus dem Container mit korrekten LIDL CSS-Selektoren"""
+        """Extrahiert ein einzelnes Produkt aus dem Container mit ALDI CSS-Selektoren"""
         try:
             # Produktname - mit flexiblen Selektoren
             title_elem = None
@@ -394,74 +410,67 @@ class LidlUltimateCrawler:
             if price is None:
                 return None
             
-            # Zusätzliche Beschreibung - KORREKT: product-grid-box__desc (optional)
-            description = ""
-            desc_elem = await container.query_selector('.product-grid-box__desc')
-            if desc_elem:
-                desc_text = await desc_elem.inner_text()
-                if desc_text:
-                    description = desc_text.strip()
+            # Einheit - mit flexiblen Selektoren
+            unit = ""
+            for unit_selector in self.unit_selectors:
+                unit_elem = await container.query_selector(unit_selector)
+                if unit_elem:
+                    try:
+                        unit_text = await unit_elem.inner_text()
+                        if unit_text:
+                            unit = unit_text.strip()
+                            break
+                    except:
+                        continue
             
-            # Bild URL - KORREKT: img tag innerhalb odsc-image-gallery
+            # Bild URL - Suche nach img-Tags
             image_url = ""
-            img_elem = await container.query_selector('.odsc-image-gallery img')
+            img_elem = await container.query_selector('img')
             if img_elem:
                 img_src = await img_elem.get_attribute('src')
                 if img_src:
                     if img_src.startswith('//'):
                         image_url = f"https:{img_src}"
                     elif img_src.startswith('/'):
-                        image_url = f"https://www.lidl.de{img_src}"
+                        image_url = f"https://www.aldi-sued.de{img_src}"
                     else:
                         image_url = img_src
             
-            # Verfügbarkeit - KORREKT: product-grid-box__availabilities
+            # Verfügbarkeit - Suche nach Verfügbarkeitsinformationen
             availability_text = ""
-            avail_elem = await container.query_selector('.product-grid-box__availabilities')
-            if avail_elem:
-                availability_text = await avail_elem.inner_text()
-                if availability_text:
-                    availability_text = availability_text.strip()
+            availability_selectors = [
+                '[class*="availability"]',
+                '[class*="stock"]',
+                '[class*="valid"]',
+                '.offer-validity'
+            ]
+            
+            for avail_selector in availability_selectors:
+                avail_elem = await container.query_selector(avail_selector)
+                if avail_elem:
+                    try:
+                        availability_text = await avail_elem.inner_text()
+                        if availability_text:
+                            availability_text = availability_text.strip()
+                            break
+                    except:
+                        continue
             
             # Parse Verfügbarkeit und Enddatum
             availability, parsed_availability_text, offer_valid_until = self._parse_availability_and_date(availability_text)
             
-            # Einheit - KORREKT: Erstes Element in ods-price__footer
-            unit = ""
-            unit_elem = await container.query_selector('.ods-price__footer')
-            if unit_elem:
-                # Nehme das erste Element innerhalb des Footer
-                first_child = await unit_elem.query_selector(':first-child')
-                if first_child:
-                    unit_text = await first_child.inner_text()
-                    if unit_text:
-                        unit = unit_text.strip()
-                else:
-                    # Fallback: Direkter Text des Footer-Elements
-                    unit_text = await unit_elem.inner_text()
-                    if unit_text:
-                        unit = unit_text.strip()
-            
-            # LIDL Plus Hinweis - KORREKT: ods-price__lidl-plus-hint
-            reward_program_hint = ""
-            reward_elem = await container.query_selector('.ods-price__lidl-plus-hint')
-            if reward_elem:
-                reward_text = await reward_elem.inner_text()
-                if reward_text:
-                    reward_program_hint = reward_text.strip()
-            
             return ProductResult(
                 name=name,
                 price=str(price),  # Convert Decimal to string
-                store="LIDL",
+                store="ALDI Süd",
                 image_url=image_url,
                 product_url=self.base_url,
                 availability="verfügbar" if availability else "nicht verfügbar",  # Convert bool to string
                 availability_text=parsed_availability_text,
                 offer_valid_until=offer_valid_until,
-                description=description,
+                description="",  # ALDI hat meist keine separate Beschreibung
                 unit=unit,
-                reward_program_hint=reward_program_hint
+                reward_program_hint=""  # ALDI hat kein spezielles Bonus-Programm wie LIDL Plus
             )
             
         except Exception as e:
@@ -473,7 +482,7 @@ class LidlUltimateCrawler:
         Parst Verfügbarkeitstext und extrahiert Enddatum
         
         Args:
-            availability_text: Text wie "nur in der Filiale 07.07. - 12.07." oder "Verfügbar"
+            availability_text: Text wie "Gültig bis 15.12." oder "Verfügbar"
             
         Returns:
             Tuple (is_available: bool, availability_text: str, valid_until: str)
@@ -513,7 +522,6 @@ class LidlUltimateCrawler:
                         try:
                             test_date = datetime(current_year, month, day).date()
                             # Wenn das Datum mehr als 30 Tage in der Vergangenheit liegt, nehme nächstes Jahr
-                            # Das behandelt Edge Cases um Jahreswechsel besser
                             days_diff = (current_date - test_date).days
                             if days_diff > 30:
                                 year = current_year + 1
@@ -552,7 +560,6 @@ class LidlUltimateCrawler:
             clean_price = re.sub(r'[^\d,.-]', '', price_text.strip())
             
             # Spezialfall: Führender Punkt/Komma (z.B. "-.90" oder ",90") 
-            # Behandle nur Preise die mit Punkt/Komma beginnen oder "-.XX" Format haben
             if clean_price.startswith('-.') and len(clean_price) <= 4:
                 # "-.90" wird zu "0.90" (nur für 1-2 stellige Zahlen nach dem Punkt)
                 clean_price = '0' + clean_price[1:]
