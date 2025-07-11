@@ -85,17 +85,31 @@ class CrawlerService:
             logger.info(f"✅ Store '{store_name}' successfully created with ID {store.id}")
             
         except Exception as e:
-            # Handle race condition: if another process created the store concurrently,
-            # we get a unique constraint violation. In this case, try to fetch the store again.
-            logger.info(f"Store creation failed (likely race condition): {str(e)}")
-            logger.info(f"Retrying store lookup for '{store_name}'")
+            # Check if this is a unique constraint violation (race condition)
+            error_str = str(e).lower()
+            is_unique_constraint_error = any(indicator in error_str for indicator in [
+                "unique constraint",
+                "duplicate key",
+                "integrity constraint",
+                "violates unique constraint",
+                "duplicate entry"
+            ])
             
-            store = await self.db_service.stores.get_by_name(store_name)
-            if store:
-                logger.info(f"✅ Store '{store_name}' found after retry (created by concurrent process)")
+            if is_unique_constraint_error:
+                # Handle race condition: another process created the store concurrently
+                logger.info(f"Store creation failed due to race condition: {str(e)}")
+                logger.info(f"Retrying store lookup for '{store_name}'")
+                
+                store = await self.db_service.stores.get_by_name(store_name)
+                if store:
+                    logger.info(f"✅ Store '{store_name}' found after retry (created by concurrent process)")
+                else:
+                    # If we still can't find it, re-raise the original error
+                    logger.error(f"Failed to create or find store '{store_name}' after retry")
+                    raise
             else:
-                # If we still can't find it, re-raise the original error
-                logger.error(f"Failed to create or find store '{store_name}' after retry")
+                # This is not a race condition - it's a validation error, connection issue, etc.
+                logger.error(f"Failed to create store '{store_name}' due to non-race-condition error: {str(e)}")
                 raise
         
         return store
