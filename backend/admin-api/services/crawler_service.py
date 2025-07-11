@@ -25,7 +25,63 @@ class CrawlerService:
             "Lidl": LidlUltimateCrawler(),
             "Aldi": AldiUltimateCrawler()
         }
+        # Store metadata for dynamic creation
+        self.store_metadata = {
+            "Lidl": {
+                "name": "Lidl",
+                "base_url": "https://www.lidl.de",
+                "logo_url": "https://www.lidl.de/favicon.ico",
+                "enabled": True
+            },
+            "Aldi": {
+                "name": "Aldi",
+                "base_url": "https://www.aldi-sued.de", 
+                "logo_url": "https://www.aldi-sued.de/favicon.ico",
+                "enabled": True
+            }
+        }
         logger.info("Ultimate crawlers (Lidl, Aldi) successfully initialized")
+    
+    async def _ensure_store_exists(self, store_name: str) -> object:
+        """
+        Ensures the store exists in the database, creating it if necessary.
+        Only creates stores that we actually crawl.
+        
+        Args:
+            store_name: Name of the store to ensure exists
+            
+        Returns:
+            Store object from database
+            
+        Raises:
+            ValueError: If store_name is not in our supported crawlers
+        """
+        if store_name not in self.crawlers:
+            raise ValueError(f"No crawler available for store: {store_name}")
+        
+        # Try to get existing store
+        store = await self.db_service.stores.get_by_name(store_name)
+        
+        if store:
+            logger.debug(f"Store '{store_name}' already exists in database")
+            return store
+        
+        # Store doesn't exist, create it dynamically
+        if store_name not in self.store_metadata:
+            raise ValueError(f"No metadata available for store: {store_name}")
+        
+        metadata = self.store_metadata[store_name]
+        logger.info(f"🏪 Creating new store '{store_name}' in database (first crawl)")
+        
+        # Create store in database
+        store = await self.db_service.stores.create(
+            name=metadata["name"],
+            base_url=metadata["base_url"],
+            logo_url=metadata["logo_url"]
+        )
+        logger.info(f"✅ Store '{store_name}' successfully created with ID {store.id}")
+        
+        return store
     
     async def crawl_store(
         self, 
@@ -64,10 +120,8 @@ class CrawlerService:
                 current_step=f"Initializing {store_name} crawler"
             )
         
-        # Get store from database
-        store = await self.db_service.stores.get_by_name(store_name)
-        if not store:
-            raise ValueError(f"Store '{store_name}' not found in database")
+        # Ensure store exists in database (create if needed)
+        store = await self._ensure_store_exists(store_name)
         
         crawler = self.crawlers[store_name]
         success_count = 0

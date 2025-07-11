@@ -225,18 +225,23 @@ async def _enhanced_trigger_crawl(crawl_id: str, store_name: Optional[str], post
             crawler_service = CrawlerService(db_service)
             
             if store_name:
-                # Crawl specific store
-                store = await db_service.stores.get_by_name(store_name)
-                if not store:
-                    raise ValueError(f"Store '{store_name}' not found")
+                # Crawl specific store - validate crawler exists
+                if store_name not in crawler_service.crawlers:
+                    raise ValueError(f"No crawler available for store: {store_name}")
                 
-                if not store.enabled:
-                    raise ValueError(f"Store '{store_name}' is disabled")
-                
+                # Get or create store dynamically 
+                store = await crawler_service._ensure_store_exists(store_name)
                 stores = [store]
             else:
-                # Crawl all enabled stores
-                stores = await db_service.stores.get_all_enabled()
+                # Crawl all available stores (using crawler service knowledge)
+                stores = []
+                for available_store_name in crawler_service.crawlers.keys():
+                    try:
+                        store = await crawler_service._ensure_store_exists(available_store_name)
+                        stores.append(store)
+                    except Exception as e:
+                        logger.warning(f"Could not prepare store {available_store_name}: {e}")
+                        continue
             
             results = []
             
@@ -394,13 +399,12 @@ async def get_stores(db_service: DatabaseService = Depends(get_database_service)
 
 @router.post("/stores/initialize")
 async def initialize_default_stores(db_service: DatabaseService = Depends(get_database_service)):
-    """Initialize default stores (Lidl)"""
-    try:
-        await db_service.initialize_stores()
-        return {"message": "Default stores initialized successfully"}
-    except Exception as e:
-        logger.error(f"Error initializing stores: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error initializing stores: {str(e)}")
+    """DEPRECATED: Stores are now created dynamically during crawling"""
+    return {
+        "message": "Store initialization is now handled automatically during crawling",
+        "note": "Stores are created dynamically when first crawled to ensure only stores with products exist",
+        "deprecated": True
+    }
 
 
 @router.get("/database/stats")

@@ -29,11 +29,8 @@ async def lifespan(app: FastAPI):
         await create_db_and_tables()
         logger.info("Database tables created/verified")
         
-        # Initialize default stores
-        async with async_session_maker() as session:
-            db_service = DatabaseService(session)
-            await db_service.initialize_stores()
-        logger.info("Default stores initialized")
+        # Note: Stores are now created dynamically when crawling begins
+        logger.info("Stores will be created dynamically during first crawl")
         
         # Start scheduler
         await scheduler_service.start()
