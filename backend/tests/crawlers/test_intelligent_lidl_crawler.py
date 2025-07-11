@@ -1,5 +1,10 @@
 """
 Test-Skript für den intelligenten Lidl-Crawler mit BeautifulSoup + LLM-Integration
+
+WICHTIGER HINWEIS:
+Der intelligente Lidl-Crawler verwendet crawl_all_products() ohne Query-Parameter.
+Für spezifische Produktsuchen verwenden Sie den SearchService, der in der Datenbank sucht.
+Dieser Test zeigt das allgemeine Crawling-Verhalten ohne spezifische Suchanfragen.
 """
 
 import asyncio
@@ -33,23 +38,39 @@ async def test_intelligent_lidl_crawler():
         
         # Async context manager verwenden
         async with crawler:
-            # Test-Queries
-            test_queries = [
-                "milch",
-                "brot", 
-                "käse",
-                "apfel",
-                "fleisch"
-            ]
-            
-            for query in test_queries:
-                logger.info(f"\n🔍 Teste Query: '{query}'")
-                try:
-                    results = await crawler.search_products(query, max_results=5)
+            # Da crawl_all_products keine Query akzeptiert, führen wir einen allgemeinen Crawl durch
+            logger.info("🔍 Starte allgemeinen Produktcrawl (crawl_all_products)")
+            try:
+                results = await crawler.crawl_all_products(max_results=20)
+                
+                if results:
+                    logger.info(f"🎯 Gefunden: {len(results)} Produkte insgesamt")
                     
-                    if results:
-                        logger.info(f"🎯 Gefunden: {len(results)} Produkte für '{query}'")
-                        for i, product in enumerate(results, 1):
+                    # Gruppiere Produkte nach potentiellen Kategorien/Typen
+                    categories = {}
+                    for product in results:
+                        # Einfache Kategorisierung basierend auf Produktnamen
+                        category = "Sonstiges"
+                        name_lower = product.name.lower()
+                        if any(word in name_lower for word in ['milch', 'joghurt', 'butter', 'käse']):
+                            category = "Milchprodukte"
+                        elif any(word in name_lower for word in ['brot', 'brötchen', 'semmel']):
+                            category = "Backwaren"
+                        elif any(word in name_lower for word in ['apfel', 'banane', 'orange', 'obst']):
+                            category = "Obst"
+                        elif any(word in name_lower for word in ['fleisch', 'wurst', 'hack']):
+                            category = "Fleisch"
+                            
+                        if category not in categories:
+                            categories[category] = []
+                        categories[category].append(product)
+                    
+                    logger.info(f"📊 Gefundene Kategorien: {list(categories.keys())}")
+                    
+                    # Zeige Beispiele aus jeder Kategorie
+                    for category, products in categories.items():
+                        logger.info(f"\n📦 {category} ({len(products)} Produkte):")
+                        for i, product in enumerate(products[:3], 1):  # Zeige nur erste 3 pro Kategorie
                             logger.info(f"  {i}. {product.name} - €{product.price} ({product.store})")
                             if product.unit:
                                 logger.info(f"     Einheit: {product.unit}")
@@ -57,14 +78,13 @@ async def test_intelligent_lidl_crawler():
                                 logger.info(f"     Marke: {product.brand}")
                             if product.available_until:
                                 logger.info(f"     Verfügbar: {product.available_until}")
-                    else:
-                        logger.info(f"📊 Keine Produkte für '{query}' gefunden")
+                        if len(products) > 3:
+                            logger.info(f"     ... und {len(products) - 3} weitere Produkte")
+                else:
+                    logger.info("📊 Keine Produkte gefunden")
                         
-                except Exception as e:
-                    logger.error(f"❌ Fehler bei Query '{query}': {e}")
-                
-                # Kurze Pause zwischen Requests
-                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"❌ Fehler beim Crawling: {e}")
         
         logger.info("🎉 Intelligenter Lidl-Crawler Test abgeschlossen!")
         

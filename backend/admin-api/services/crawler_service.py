@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from shared.services.database_service import DatabaseService
 from .lidl_crawler_ultimate import LidlUltimateCrawler
+from .aldi_crawler_ultimate import AldiUltimateCrawler
 from .crawl_status_service import crawl_status_service, CrawlStatus
 from shared.models.search import ProductResult
 from shared.core.config import settings
@@ -21,18 +22,10 @@ class CrawlerService:
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
         self.crawlers = {
-            "Lidl": LidlUltimateCrawler()
+            "Lidl": LidlUltimateCrawler(),
+            "Aldi": AldiUltimateCrawler()
         }
-        # Add Aldi crawler if enabled and Firecrawl is available
-        if settings.aldi_crawler_enabled and settings.firecrawl_enabled:
-            try:
-                from .aldi_crawler import create_aldi_crawler
-                aldi_crawler = create_aldi_crawler()
-                if aldi_crawler:
-                    self.crawlers["Aldi"] = aldi_crawler
-                    logger.info("Aldi crawler successfully initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize Aldi crawler: {e}")
+        logger.info("Ultimate crawlers (Lidl, Aldi) successfully initialized")
     
     async def crawl_store(
         self, 
@@ -111,10 +104,10 @@ class CrawlerService:
                         postal_code=postal_code
                     )
                 elif store_name == "Aldi":
-                    # Aldi kann weiterhin query-basiert sein bis es umgebaut wird
-                    products = await crawler.search_products(
-                        query="", 
-                        max_results=settings.aldi_max_products_per_crawl
+                    # Aldi verwendet jetzt auch das neue Ultimate-System
+                    products = await crawler.crawl_all_products(
+                        max_results=settings.aldi_max_products_per_crawl, 
+                        postal_code=postal_code
                     )
                 else:
                     logger.error(f"Unknown crawler implementation for {store_name}")
